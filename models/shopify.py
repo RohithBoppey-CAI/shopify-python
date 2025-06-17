@@ -83,38 +83,19 @@ class ShopifyAPIClient:
 
     def wait_for_bulk_operation_to_complete(self):
         POLL_INTERVAL_SEC = 5
-
-        status_query = """
-        query {
-        currentBulkOperation(type: QUERY) {
-            id
-            status
-            errorCode
-            createdAt
-            completedAt
-            objectCount
-            fileSize
-            url
-        }
-        }
-        """
-        headers = {
-            "Content-Type": "application/json",
-            "X-Shopify-Access-Token": self.access_token,
-        }
+        print("⏳ Waiting for bulk operation to complete...")
         while True:
-            response = requests.post(
-                self.graphql_endpoint, headers=headers, json={"query": status_query}
-            )
-            result = response.json()
-            op = result.get("data", {}).get("currentBulkOperation", {})
-            print(f"Status: {op.get('status')}")
-            if op.get("status") == "COMPLETED":
+            op = self.is_bulk_operation_running(return_op=True)
+            status = op.get("status")
+            print(f"Status: {status}")
+            if status == "COMPLETED":
                 print(f"✅ Bulk operation completed. Download URL: {op.get('url')}")
                 return op.get("url")
-            if op.get("status") in ("FAILED", "CANCELED"):
+
+            if status in ("FAILED", "CANCELED"):
                 print(f"❌ Bulk operation failed: {op.get('errorCode')}")
-                raise Exception(f"Bulk operation {op.get('status')}")
+                raise Exception(f"Bulk operation {status}")
+
             time.sleep(POLL_INTERVAL_SEC)
 
     def fetch_sample_products(self, limit=20):
@@ -138,10 +119,39 @@ class ShopifyAPIClient:
         except Exception as e:
             print(f"Failed to fetch products: {e}")
 
+    def is_bulk_operation_running(self, return_op=False):
+        query = """
+        query {
+            currentBulkOperation(type: QUERY) {
+                id
+                status
+                errorCode
+                createdAt
+                completedAt
+                objectCount
+                fileSize
+                url
+            }
+        }
+        """
+        try:
+            data = self.execute_query(query)
+            op = data.get("data", {}).get("currentBulkOperation", {})
+            if return_op:
+                return op
+            return op.get("status") not in (None, "COMPLETED", "FAILED", "CANCELED")
+        except requests.exceptions.RequestException as e:
+            print("Failed to check bulk operation status:", e)
+            return False if not return_op else {}
+
     def execute_bulk_operations(self, query: str, wait=False):
         result = {}
-        # bulk_operation_id = self.start_bulk_operation(bulk_graphql_query=query)
-        # result["operation_id"] = bulk_operation_id
+        if not self.is_bulk_operation_running():
+            bulk_operation_id = self.start_bulk_operation(bulk_graphql_query=query)
+            result["operation_id"] = bulk_operation_id
+        else:
+            raise ("⚠️ A bulk operation is already running. Skipping new operation.")
+
         result_endpoint = self.wait_for_bulk_operation_to_complete() if wait else None
         result["output_url"] = result_endpoint
         return result
