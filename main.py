@@ -41,6 +41,7 @@ async def auth_callback(request: Request):
     """
     This gets executed once the app has been added and approved by the store admin from the "Install app into your store" page
     """
+    print("App has been authenticated successfully, In callback function now!")
     token_result = get_store_access_token(request)
 
     # trigger download in the background

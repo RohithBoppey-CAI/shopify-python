@@ -19,7 +19,7 @@ def extract_inventory_response_basic(data):
 
 def get_all_product_catalogue(
     request: dict,
-    save_file_name: str,
+    save_file_name: str = "file.json",
     url_key="output_url",
     wait=False,
     save=False,
