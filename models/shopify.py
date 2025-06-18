@@ -88,6 +88,9 @@ class ShopifyAPIClient:
         return bulk_op.get("id")
 
     def wait_for_bulk_operation_to_complete(self):
+        """
+        Wait until the last known bulk operation to complete!
+        """
         POLL_INTERVAL_SEC = 5
         print("⏳ Waiting for bulk operation to complete...")
         while True:
@@ -145,7 +148,12 @@ class ShopifyAPIClient:
             op = data.get("data", {}).get("currentBulkOperation", {})
             if return_op:
                 return op
-            return op.get("status") not in (None, "COMPLETED", "FAILED", "CANCELED")
+            # The current operation can also be done
+            if op is None:
+                return False
+            status = op.get("status", None)
+            # if status in this, means running!
+            return status not in (None, "COMPLETED", "FAILED", "CANCELED")
         except requests.exceptions.RequestException as e:
             print("Failed to check bulk operation status:", e)
             return False if not return_op else {}
@@ -153,13 +161,19 @@ class ShopifyAPIClient:
     def execute_bulk_operations(self, query: str, wait=False):
         result = {}
         if not self.is_bulk_operation_running():
+            print("Starting bulk operation!")
             bulk_operation_id = self.start_bulk_operation(bulk_graphql_query=query)
             result["operation_id"] = bulk_operation_id
         else:
             raise ("⚠️ A bulk operation is already running. Skipping new operation.")
 
-        result_endpoint = self.wait_for_bulk_operation_to_complete() if wait else None
-        result["output_url"] = result_endpoint
+        if wait:
+            result_endpoint = (
+                self.wait_for_bulk_operation_to_complete() if wait else None
+            )
+            result["output_url"] = result_endpoint
+        else:
+            result["status"] = "Bulk operation started"
         return result
 
     def fetch_product_catalogue_details(self, wait=False):
@@ -216,7 +230,12 @@ class ShopifyAPIClient:
             }
         """
 
-        return self.execute_bulk_operations(query, wait)
+        try:
+            print("Fetching product catalogue information")
+            return self.execute_bulk_operations(query, wait)
+        except Exception as e:
+            print(f"Error in fetching product catalogue: {e}")
+            return {}
 
 
 class ShopifyAppClient:

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from utils.shopify import (
-    get_all_product_ids,
+    get_all_product_catalogue,
     store_app_auth_init,
     get_store_access_token,
 )
@@ -18,7 +18,7 @@ async def root():
 
 @app.post("/get-product-catalogue")
 async def get_product_catalogue(request: dict):
-    result = get_all_product_ids(request)
+    result = get_all_product_catalogue(request, wait=True)
     return result
 
 
@@ -32,11 +32,20 @@ async def install_app(request: dict):
 
 
 @app.get("/auth/callback")
-def auth_callback(request: Request):
+async def auth_callback(request: Request):
     """
     This gets executed once the app has been added and approved by the store admin from the "Install app into your store" page
     """
-    return get_store_access_token(request)
+    token_result = get_store_access_token(request)
+
+    # trigger download in the background
+    status_message = get_all_product_catalogue(token_result, wait=False)
+
+    return {
+        "status": "Products downloading started in background",
+        "status_message": status_message,
+        "credentials": token_result,
+    }
 
 
 if __name__ == "__main__":

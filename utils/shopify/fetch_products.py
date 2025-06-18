@@ -1,6 +1,7 @@
 from models.shopify import ShopifyAPIClient, ShopifyAppClient
 from ..commons.api_utils import read_jsonl_from_url
 from dotenv import load_dotenv
+from ..commons.file_utils import save_to_json
 
 load_dotenv()
 
@@ -19,23 +20,35 @@ def extract_inventory_response_basic(data):
     return all_products
 
 
-def get_all_product_ids(request: dict, url_key="output_url"):
+def get_all_product_catalogue(
+    request: dict,
+    save_file_name: str,
+    url_key="output_url",
+    wait=False,
+    save=False,
+):
     try:
-        shop_id = request.get("shop_id", None)
+        shop_id = request.get("store", None)
         access_token = request.get("access_token", None)
 
         if not shop_id or not access_token:
-            raise ("Non valid shop id or access token given")
+            raise Exception("Non valid shop id or access token given")
 
         client = ShopifyAPIClient(shop_url=shop_id, access_token=access_token)
 
         # TODO: insert the details in the DB
-        details = client.fetch_product_catalogue_details(wait=True)
+        details = client.fetch_product_catalogue_details(wait=wait)
 
-        # read from the endpoint into json and return it
-        all_objects = read_jsonl_from_url(details[url_key])
+        # read from the endpoint into json and return it if waiting is enabled
+        if wait and url_key in details:
+            print("Found the URL in the response, reading it to give products!")
+            all_objects = read_jsonl_from_url(details[url_key])
+            if save:
+                save_to_json(save_file_name, all_objects)
+            return all_objects
+        else:
+            return details
 
-        return all_objects
     except Exception as e:
         print(f"Error occurred in getting product catalogue info: {e}")
 
@@ -57,7 +70,6 @@ def get_store_access_token(request: dict):
         shop = query_params.get("shop", "shop")
         code = query_params.get("code", "shop")
 
-        print(shop, code)
         access_token = client.return_shopify_store_access_token(shop, code)
 
         # TODO: store it in DB
