@@ -257,8 +257,9 @@ class ShopifyAppClient:
         """
         Use the shop and code to create and return the access token
         """
+        admin_url = f"https://{shop}/admin/oauth/access_token"
         token_response = requests.post(
-            f"https://{shop}/admin/oauth/access_token",
+            admin_url,
             json={
                 "client_id": self.client_id,
                 "client_secret": self.client_secret,

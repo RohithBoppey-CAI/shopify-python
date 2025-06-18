@@ -55,6 +55,7 @@ def get_store_access_token(request: dict):
         client = ShopifyAppClient()
         shop = request.get("shop")
         code = request.get("code")
+        print(request)
         access_token = client.return_shopify_store_access_token(shop, code)
         # TODO: store it in DB
         return {"store": shop, "access_token": access_token}
