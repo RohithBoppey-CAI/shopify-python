@@ -4,11 +4,17 @@ from dotenv import load_dotenv
 import asyncio
 import httpx
 import time
+import urllib
 
 load_dotenv()
 
 
 class ShopifyAPIClient:
+    """
+    This is to access the store level functions
+    - like downloading catalogue from a store
+    """
+
     def __init__(self, shop_url=None, access_token=None, asyncr=False):
         self.shop_url = shop_url or os.getenv("SHOP_URL", "your-store.myshopify.com")
         self.access_token = access_token or os.getenv(
@@ -211,6 +217,41 @@ class ShopifyAPIClient:
         """
 
         return self.execute_bulk_operations(query, wait)
+
+
+class ShopifyAppClient:
+    def __init__(
+        self, client_id=None, client_secret=None, scopes=None, redirect_url=None
+    ):
+        self.client_id = client_id or os.getenv("SHOPIFY_APP_KEY", "your-client-id")
+        self.client_secret = client_secret or os.getenv(
+            "SHOPIFY_APP_SECRET", "your-client-secret"
+        )
+        self.scopes = scopes or os.getenv(
+            "SHOPIFY_APP_SCOPES", "read_products,write_orders"
+        )
+        self.redirect_url = redirect_url or os.getenv(
+            "SHOPIFY_APP_REDIRECT_URL", "https://yourapp.com/callback"
+        )
+
+        if isinstance(scopes, str):
+            self.scopes = scopes.split(",")
+
+        print("Shopify APP Client initialized")
+
+    def return_app_install_url(self, store: str = None):
+        try:
+            if not store:
+                raise ("No store found")
+            install_url = (
+                f"https://{store}/admin/oauth/authorize"
+                f"?client_id={self.client_id}"
+                f"&scope={self.scopes}"
+                f"&redirect_uri={urllib.parse.quote(self.redirect_url)}"
+            )
+            return install_url
+        except Exception as e:
+            print(f"Exception in creating store url: {e}")
 
 
 if __name__ == "__main__":

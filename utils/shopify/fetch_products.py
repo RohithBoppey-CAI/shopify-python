@@ -1,5 +1,8 @@
-from models.shopify import ShopifyAPIClient
+from models.shopify import ShopifyAPIClient, ShopifyAppClient
 from ..commons.api_utils import read_jsonl_from_url
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def extract_inventory_response_basic(data):
@@ -16,7 +19,7 @@ def extract_inventory_response_basic(data):
     return all_products
 
 
-def get_all_product_ids(request: dict, url_key = "output_url"):
+def get_all_product_ids(request: dict, url_key="output_url"):
     try:
         shop_id = request.get("shop_id", None)
         access_token = request.get("access_token", None)
@@ -25,6 +28,8 @@ def get_all_product_ids(request: dict, url_key = "output_url"):
             raise ("Non valid shop id or access token given")
 
         client = ShopifyAPIClient(shop_url=shop_id, access_token=access_token)
+
+        # TODO: insert the details in the DB
         details = client.fetch_product_catalogue_details(wait=True)
 
         # read from the endpoint into json and return it
@@ -33,6 +38,16 @@ def get_all_product_ids(request: dict, url_key = "output_url"):
         return all_objects
     except Exception as e:
         print(f"Error occurred in getting product catalogue info: {e}")
+
+
+def get_store_token_id(request: dict):
+    try:
+        store = request.get("store", None)
+        client = ShopifyAppClient()
+        return client.return_app_install_url(store=store)
+
+    except Exception as e:
+        print(f"Exception in bringing store access id: {e}")
 
 
 # if __name__ == "__main__":
