@@ -1,5 +1,9 @@
 from fastapi import FastAPI, Request
-from utils.shopify import get_all_product_ids, get_store_token_id
+from utils.shopify import (
+    get_all_product_ids,
+    store_app_auth_init,
+    get_store_access_token,
+)
 import os
 import uvicorn
 from fastapi.responses import RedirectResponse
@@ -22,31 +26,17 @@ async def get_product_catalogue(request: dict):
 async def install_app(request: dict):
     # this is the function that gets executed when a store / user installs our application
     # the merchant will be getting a request to authorize our application
-    install_url = get_store_token_id(request)
+    install_url = store_app_auth_init(request)
     print(install_url)
     return RedirectResponse(url=install_url)
 
 
 @app.get("/auth/callback")
 def auth_callback(request: Request):
-    print(request)
-    shop = request.query_params.get("shop")
-    code = request.query_params.get("code")
-
-    print(shop)
-    print(code)
-    
-    # token_response = requests.post(
-    #     f"https://{shop}/admin/oauth/access_token",
-    #     json={
-    #         "client_id": SHOPIFY_API_KEY,
-    #         "client_secret": SHOPIFY_API_SECRET,
-    #         "code": code
-    #     }
-    # )
-
-    # token_data = token_response.json()
-    # access_token = token_data["access_token"]
+    """
+    This gets executed once the app has been added and approved by the store admin from the "Install app into your store" page
+    """
+    return get_store_access_token(request)
 
 
 if __name__ == "__main__":

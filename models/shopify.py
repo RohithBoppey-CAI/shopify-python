@@ -253,6 +253,23 @@ class ShopifyAppClient:
         except Exception as e:
             print(f"Exception in creating store url: {e}")
 
+    def return_shopify_store_access_token(self, shop: str, code: str):
+        """
+        Use the shop and code to create and return the access token
+        """
+        token_response = requests.post(
+            f"https://{shop}/admin/oauth/access_token",
+            json={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "code": code,
+            },
+        )
+
+        token_data = token_response.json()
+        access_token = token_data["access_token"]
+        return access_token
+
 
 if __name__ == "__main__":
     client = ShopifyAPIClient(asyncr=True)

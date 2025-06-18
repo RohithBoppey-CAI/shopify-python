@@ -40,7 +40,7 @@ def get_all_product_ids(request: dict, url_key="output_url"):
         print(f"Error occurred in getting product catalogue info: {e}")
 
 
-def get_store_token_id(request: dict):
+def store_app_auth_init(request: dict):
     try:
         store = request.get("store", None)
         client = ShopifyAppClient()
@@ -48,6 +48,19 @@ def get_store_token_id(request: dict):
 
     except Exception as e:
         print(f"Exception in bringing store access id: {e}")
+
+
+def get_store_access_token(request: dict):
+    try:
+        client = ShopifyAppClient()
+        shop = request.get("shop")
+        code = request.get("code")
+        access_token = client.return_shopify_store_access_token(shop, code)
+        # TODO: store it in DB
+        return {"store": shop, "access_token": access_token}
+
+    except Exception as e:
+        print(f"Exception in generating store access token: {e}")
 
 
 # if __name__ == "__main__":
