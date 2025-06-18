@@ -1,9 +1,6 @@
 from models.shopify import ShopifyAPIClient, ShopifyAppClient
 from ..commons.api_utils import read_jsonl_from_url
-from dotenv import load_dotenv
 from ..commons.file_utils import save_to_json
-
-load_dotenv()
 
 
 def extract_inventory_response_basic(data):
@@ -44,7 +41,7 @@ def get_all_product_catalogue(
             print("Found the URL in the response, reading it to give products!")
             all_objects = read_jsonl_from_url(details[url_key])
             if save:
-                save_to_json(save_file_name, all_objects)
+                save_to_json(filename=save_file_name, data_dict=all_objects)
             return all_objects
         else:
             return details

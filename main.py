@@ -18,7 +18,12 @@ async def root():
 
 @app.post("/get-product-catalogue")
 async def get_product_catalogue(request: dict):
-    result = get_all_product_catalogue(request, wait=True)
+    result = get_all_product_catalogue(
+        request,
+        wait=True,
+        save=True,
+        save_file_name="products.json",
+    )
     return result
 
 
