@@ -9,6 +9,8 @@ import os
 import uvicorn
 from fastapi.responses import RedirectResponse
 
+from routers import template_router
+
 app = FastAPI()
 
 
@@ -48,11 +50,15 @@ async def auth_callback(request: Request):
     # trigger download in the background
     status_message = get_all_product_catalogue(token_result, wait=False)
 
-    return {
+    message = {
         "status": "Products downloading started in background",
         "status_message": status_message,
         "credentials": token_result,
     }
+    print(message)
+    store = token_result.get("store", None)
+
+    return RedirectResponse(url=f"/get-started?store={store}")
 
 
 @app.post("/last-bulk-operation")
@@ -63,6 +69,8 @@ async def get_last_bulk_operation(request: dict):
     print("Checking the status of the last bulk operation")
     return get_last_bulk_operation_status(request)
 
+
+app.include_router(template_router)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

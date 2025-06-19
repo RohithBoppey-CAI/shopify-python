@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Welcome to Your App</title>
+</head>
+
+<body>
+    <h2>Store Installation Successful 🎉</h2>
+
+    <!-- <p>Status: {{ status_message }}</p> -->
+    <p>Store Domain: {{ store }}</p>
+
+    <form method="post" action="/submit-details">
+        <input type="hidden" name="store" value="{{ store }}">
+        <label>Your Name:</label>
+        <input type="text" name="owner_name" required><br>
+
+        <label>Contact Email:</label>
+        <input type="email" name="contact_email"><br>
+
+        <label>Extra Setup Info (JSON):</label><br>
+        <textarea name="extra_info" rows="5" cols="50">{}</textarea><br><br>
+
+        <button type="submit">Finish Setup</button>
+    </form>
+</body>
+
+</html>
