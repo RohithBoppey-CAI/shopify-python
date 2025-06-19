@@ -3,6 +3,7 @@ from utils.shopify import (
     get_all_product_catalogue,
     store_app_auth_init,
     get_store_access_token,
+    get_last_bulk_operation_status,
 )
 import os
 import uvicorn
@@ -52,6 +53,15 @@ async def auth_callback(request: Request):
         "status_message": status_message,
         "credentials": token_result,
     }
+
+
+@app.post("/last-bulk-operation")
+async def get_last_bulk_operation(request: dict):
+    """
+    Check the status of the last bulk operation
+    """
+    print("Checking the status of the last bulk operation")
+    return get_last_bulk_operation_status(request)
 
 
 if __name__ == "__main__":

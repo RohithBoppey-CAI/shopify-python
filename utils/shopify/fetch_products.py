@@ -76,6 +76,18 @@ def get_store_access_token(request: dict):
         print(f"Exception in generating store access token: {e}")
 
 
+def get_last_bulk_operation_status(request: dict):
+    shop_id = request.get("store", None)
+    access_token = request.get("access_token", None)
+
+    if not shop_id or not access_token:
+        raise Exception("Non valid shop id or access token given")
+
+    client = ShopifyAPIClient(shop_url=shop_id, access_token=access_token)
+    status = client.is_bulk_operation_running(return_op=True)
+    return status
+
+
 # if __name__ == "__main__":
 #     LIMIT = 20
 #     res = get_all_product_ids(LIMIT)
