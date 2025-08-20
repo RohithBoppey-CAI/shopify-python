@@ -1,1 +1,1 @@
-from .shopify import *
+from .shopify_client import *
