@@ -8,10 +8,10 @@ from fastapi.templating import Jinja2Templates
 
 from core.config import settings
 from services import shopify_auth_service, shopify_product_service
-# from models.database import SessionLocal, engine, Base
+from models.database import SessionLocal, engine, Base
 
 # Create database tables
-# Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Couture Search Shopify App",
@@ -24,12 +24,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # Dependency for database sessions
-# def get_db():
-    # db = SessionLocal()
-    # try:
-    #     yield db
-    # finally:
-    #     db.close()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @app.get("/")
 async def root():

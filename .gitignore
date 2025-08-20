@@ -5,3 +5,6 @@
 
 # for development purposes
 **/*dummycouture*
+
+# remove any sqlite files
+**/*.db
