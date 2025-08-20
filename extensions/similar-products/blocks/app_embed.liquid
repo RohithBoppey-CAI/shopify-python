@@ -1,0 +1,176 @@
+{% comment %}
+  This template now uses client-side JavaScript and the Storefront API
+  to fetch and render the similar products carousel.
+{% endcomment %}
+
+<div class="couture-similar-products-container">
+  <h3>{{ 'products.product.similar_products' | t }}</h3>
+  
+  <div class="couture-carousel-wrapper" id="couture-carousel-wrapper-{{ section.id }}">
+    <div class="couture-carousel" id="couture-carousel-{{ section.id }}">
+      <!-- Products will be injected here by JavaScript -->
+      <p>Loading similar products...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  (async function() {
+    // Hardcoded list of product IDs for testing
+    const productIds = ["9070935769311", "9073763483871", "9118079975647", "9118080041183"];
+    
+    const productGids = productIds.map(id => `gid://shopify/Product/${id}`);
+    console.log('Fetching products for GIDs:', productGids);
+
+    const query = `
+      query getProductsByIds($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on Product {
+            id
+            title
+            handle
+            onlineStoreUrl
+            featuredImage {
+              url(transform: {maxWidth: 400})
+              altText
+            }
+            priceRange {
+              minVariantPrice {
+                amount
+                currencyCode
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const storefrontAccessToken = 'df2dc6b8360a3bf8ecca291e2c72ffdb';
+
+      const response = await fetch('{{ shop.url }}/api/2025-04/graphql.json', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Storefront-Access-Token': storefrontAccessToken
+        },
+        body: JSON.stringify({
+          query: query,
+          variables: { ids: productGids }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const jsonResponse = await response.json();
+      const products = jsonResponse.data.nodes.filter(p => p !== null);
+
+      console.log('Products found:', products);
+
+      const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+      if (products.length > 0) {
+        let productsHtml = '';
+        products.forEach(product => {
+          // --- THIS IS THE FIX ---
+          // 1. Provide a placeholder image if featuredImage is null.
+          const imageUrl = product.featuredImage 
+            ? product.featuredImage.url 
+            : 'https://cdn.shopify.com/s/files/1/0533/2089/files/placeholder-images-image_large.png';
+          
+          // 2. Construct a fallback URL using the product handle if onlineStoreUrl is null.
+          const productUrl = product.onlineStoreUrl || `/products/${product.handle}`;
+
+          const price = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: product.priceRange.minVariantPrice.currencyCode
+          }).format(product.priceRange.minVariantPrice.amount);
+
+          productsHtml += `
+            <div class="couture-carousel-item">
+              <a href="${productUrl}" class="couture-product-card">
+                <div class="couture-product-image">
+                  <img src="${imageUrl}" 
+                       alt="${product.featuredImage ? product.featuredImage.altText : product.title}" 
+                       loading="lazy"
+                       width="200">
+                </div>
+                <div class="couture-product-info">
+                  <p class="couture-product-title">${product.title}</p>
+                  <p class="couture-product-price">${price}</p>
+                </div>
+              </a>
+            </div>
+          `;
+        });
+        carouselContainer.innerHTML = productsHtml;
+      } else {
+        carouselContainer.innerHTML = '<p>No similar products found.</p>';
+      }
+
+    } catch (error) {
+      console.error('Error fetching similar products:', error);
+      const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+      carouselContainer.innerHTML = '<p>Could not load products.</p>';
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Similar Products Carousel",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Couture Search App"
+    },
+    {
+      "type": "paragraph",
+      "content": "Add this block to your product page to display AI-powered similar product recommendations."
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+  .couture-similar-products-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  .couture-carousel-wrapper {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .couture-carousel {
+    display: flex;
+    gap: 20px;
+    padding-bottom: 15px;
+  }
+  .couture-carousel-item {
+    flex: 0 0 200px;
+  }
+  .couture-product-card {
+    text-decoration: none;
+    color: inherit;
+  }
+  .couture-product-image img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  .couture-product-info {
+    margin-top: 10px;
+  }
+  .couture-product-title {
+    font-weight: bold;
+    margin: 0 0 5px 0;
+  }
+  .couture-product-price {
+    margin: 0;
+  }
+</style>

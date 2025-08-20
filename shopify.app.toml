@@ -22,3 +22,4 @@ embedded = false
 
 [build]
 include_config_on_deploy = true
+command = "cd web && uvicorn main:app --host 0.0.0.0 --port {port}"
