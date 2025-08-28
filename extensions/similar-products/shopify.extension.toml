@@ -1,3 +1,6 @@
 # This file defines your new Theme App Extension.
 name = "Similar Products Carousel"
-type = "theme"
+type = "theme_app_extension"
+
+[capabilities]
+block_rendering = true
