@@ -567,11 +567,10 @@ This approach:
     }
 
     .couture-carousel-wrapper {
-        display: grid;
+        display: grid; /* Changed from grid for simplicity */
         overflow-x: auto;
         scrollbar-width: thin;
         scrollbar-color: #ccc transparent;
-        border-radius: 8px;
     }
 
     .couture-carousel-wrapper::-webkit-scrollbar {
@@ -592,56 +591,63 @@ This approach:
         background: #999;
     }
 
+    /* --- START OF THE FINAL, SIMPLIFIED FIX --- */
+
+    /* 1. Carousel Container: Simple flexbox setup. */
     .couture-carousel {
         display: flex;
-        gap: 1rem;
-        padding-bottom: 15px;
-        min-height: 200px;
+        padding-bottom: 20px; /* Extra space for scrollbar visibility */
+        margin: 0;
+        padding-left: 0;
     }
 
-    /* Ensure carousel items maintain proper sizing */
+    /* 2. Card Item: Set a generous width and spacing. */
     .couture-carousel > * {
-        flex: 0 0 auto;
-        min-width: 200px;
-        max-width: 300px;
-    }
-
-    /* Debug panel styling */
-    .couture-debug-panel {
-        font-family: monospace;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-
-    .couture-debug-panel pre {
-        background: #f8f8f8;
-        padding: 8px;
-        border-radius: 4px;
-        overflow-x: auto;
-    }
-
-    /* Custom card styling (fallback) */
-    .couture-custom-card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .couture-custom-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-
-    .couture-carousel .grid__item {
+        flex: 0 0 280px; /* A wider, more stable card width */
         list-style: none;
+        display: flex;
+        flex-direction: column; /* Ensures content stacks vertically */
+        padding: 0;
+        border: none;
+    }
+    
+    .couture-carousel > *:not(:last-child) {
+        margin-right: 30px; /* Generous spacing to match the desired look */
     }
 
-    /* Responsive adjustments */
-    @media screen and (max-width: 768px) {
-        .couture-carousel > * {
-            min-width: 160px;
-        }
+    /* 3. The Image (THE NEW, SIMPLIFIED LOGIC): Style the <img> tag directly. */
+    /* This is the safest and most reliable way to control the image. */
+    .couture-carousel img {
+        display: block;
         
-        .couture-carousel {
-            gap: 0.75rem;
-        }
+        /* The key fix: Set the aspect ratio directly on the image */
+        aspect-ratio: 4 / 5;
+        
+        /* Make the image fill the width of the card */
+        width: 100%;
+        height: auto; /* Height will be calculated automatically from the aspect ratio */
+        
+        /* Ensure the image content is cropped, not squished */
+        object-fit: cover;
+        
+        /* Add some space between the image and the text below it */
+        margin-bottom: 1rem;
     }
+    
+    /* 4. Text Content: Clean up link styles and ensure visibility. */
+    .couture-carousel .card__content,
+    .couture-carousel .card-information,
+    .couture-carousel .product-card__info {
+        text-align: left; /* Or 'center' if you prefer */
+        padding: 0 5px; /* A little horizontal padding for the text */
+        text-decoration: none;
+    }
+    
+    .couture-carousel a {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    /* --- END OF THE FINAL, SIMPLIFIED FIX --- */
+
 </style>
