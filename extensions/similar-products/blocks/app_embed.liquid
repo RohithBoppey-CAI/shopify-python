@@ -1,0 +1,653 @@
+{% comment %}
+USER-CONFIGURABLE VERSION
+This approach:
+1. Lets the user specify their theme's product card selector
+2. Extracts and reuses the exact same template structure
+3. Falls back to custom UI only if the user's selector doesn't work
+4. Provides detailed logging for debugging
+{% endcomment %}
+
+<div class="related-products page-width" id="couture-container-{{ section.id }}"
+     data-section-id="{{ section.id }}"
+     data-user-selector="{{ section.settings.user_product_selector }}"
+     data-user-container="{{ section.settings.user_container_selector }}"
+     data-debug-mode="{{ section.settings.debug_mode }}">
+    
+    <h3>{{ section.settings.section_title | default: 'Similar Products' }}</h3>
+    
+    {% if section.settings.debug_mode %}
+    <div class="couture-debug-panel" style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-size: 12px;">
+        <strong>Debug Information:</strong>
+        <p><strong>User Product Selector:</strong> {{ section.settings.user_product_selector | default: 'Not set' }}</p>
+        <p><strong>User Container Selector:</strong> {{ section.settings.user_container_selector | default: 'Not set' }}</p>
+        <p><strong>Current Product ID:</strong> {{ product.id | default: 'Not on product page' }}</p>
+        <div id="debug-log-{{ section.id }}"></div>
+    </div>
+    {% endif %}
+    
+    <div class="couture-carousel-wrapper" id="couture-carousel-wrapper-{{ section.id }}">
+        <div class="couture-carousel" id="couture-carousel-{{ section.id }}">
+            <p>Loading similar products...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async function () {
+        console.log('=== COUTURE USER-CONFIGURABLE APPROACH START ===');
+        
+        const coutureSettings = {
+          sectionId: {{ section.id | json }},
+          userProductSelector: {{ section.settings.user_product_selector | json }},
+          userContainerSelector: {{ section.settings.user_container_selector | json }},
+          debugMode: {{ section.settings.debug_mode | json }}
+        };
+
+        // const coutureSettings = {
+        //   sectionId: {{ section.id | json }},
+        //   userProductSelector: '.grid__item', // Forcing your desired selector
+        //   userContainerSelector: 'grid product-grid grid--4-col-desktop grid--2-col-tablet-down',          // Forcing empty for now
+        //   debugMode: true                     // Forcing debug mode ON
+        // };
+
+        const container = document.getElementById('couture-container-' + coutureSettings.sectionId);
+        const sectionId = coutureSettings.sectionId;
+        const userProductSelector = coutureSettings.userProductSelector;
+        const userContainerSelector = coutureSettings.userContainerSelector;
+        const debugMode = coutureSettings.debugMode;
+        
+        // Debug logging function
+        function debugLog(message, data = null) {
+            console.log(`[COUTURE DEBUG] ${message}`, data || '');
+            
+            if (debugMode) {
+                const debugPanel = document.getElementById('debug-log-{{ section.id }}');
+                if (debugPanel) {
+                    const logEntry = document.createElement('div');
+                    logEntry.style.marginTop = '5px';
+                    logEntry.style.padding = '5px';
+                    logEntry.style.background = '#fff';
+                    logEntry.style.border = '1px solid #ddd';
+                    logEntry.innerHTML = `
+                        <strong>${new Date().toLocaleTimeString()}:</strong> ${message}
+                        ${data ? `<pre style="margin: 5px 0; font-size: 11px;">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</pre>` : ''}
+                    `;
+                    debugPanel.appendChild(logEntry);
+                }
+            }
+        }
+        
+        // Analyze current page structure for debugging
+    function analyzePageStructure() {
+        const commonSelectors = [
+            '.card-wrapper',
+            '.product-card',
+            '.product-item',
+            '.grid__item',
+            '.product',
+            '[data-product-id]',
+            '.card',
+            '.product-card-wrapper',
+            '.grid-product'
+        ];
+        
+        const foundElements = {};
+        let totalProductCards = 0;
+        
+        commonSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                foundElements[selector] = {
+                    count: elements.length,
+                    sampleClasses: elements[0].className,
+                    hasProductLink: !!elements[0].querySelector('a[href*="/products/"]')
+                };
+                
+                // Count potential product cards
+                if (elements[0].querySelector('a[href*="/products/"]')) {
+                    totalProductCards += elements.length;
+                }
+            }
+        });
+        
+        debugLog('Page Structure Analysis', {
+            foundElements,
+            totalProductCards,
+            pageTitle: document.title,
+            bodyClasses: document.body.className
+        });
+        
+        // Check for existing product recommendation sections
+        const existingRecommendations = document.querySelectorAll('[data-section-type*="product-recommendations"], [class*="related"], [class*="similar"], [class*="recommend"]');
+        if (existingRecommendations.length > 0) {
+            debugLog('Found existing recommendation sections', {
+                count: existingRecommendations.length,
+                sections: Array.from(existingRecommendations).map(el => ({
+                    tagName: el.tagName,
+                    classes: el.className,
+                    id: el.id
+                }))
+            });
+        }
+    }
+
+    // Render using user-specified selector
+    async function renderWithUserSelector(productHandles, userSelector, userContainerSelector) {
+        debugLog(`Trying user selector: "${userSelector}"`);
+        
+        // Check if selector exists on current page
+        const selectorExists = document.querySelector(userSelector);
+        debugLog('User selector check', {
+            selector: userSelector,
+            exists: !!selectorExists,
+            count: document.querySelectorAll(userSelector).length
+        });
+        
+        if (!selectorExists) {
+            debugLog('User selector not found on current page, trying collection approach...');
+        }
+        
+        // This is the NEW code to replace it with
+        // Construct a precise search URL for the exact product handles
+        const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+        const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product`;
+
+        try {
+            debugLog(`Fetching specific products with URL: ${searchUrl}`);
+
+            const response = await fetch(searchUrl);
+            if (!response.ok) {
+                throw new Error(`Search request failed: ${response.status}`);
+            }
+
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            // Look for user's selector in the search results page
+            const userElements = doc.querySelectorAll(userSelector);
+            debugLog('User selector in search results page', {
+                searchUrl,
+                selectorFound: userElements.length > 0,
+                count: userElements.length
+            });
+
+            if (userElements.length > 0) {
+                // Extract the cards
+                const extractedCards = Array.from(userElements).map(el => el.outerHTML);
+
+                // Insert into carousel
+                const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+
+                debugLog("Injecting cards directly into the carousel");
+                carouselContainer.innerHTML = extractedCards.join('');
+
+                // Apply carousel styling and theme scripts
+                applyCarouselStyling(carouselContainer);
+                reinitializeThemeScripts(carouselContainer);
+
+                debugLog('SUCCESS: User selector approach worked', {
+                    extractedCount: extractedCards.length,
+                    approach: 'user-selector'
+                });
+
+                return;
+            } else {
+                throw new Error(`Selector "${userSelector}" not found on search results page.`);
+            }
+        } catch (error) {
+            debugLog(`Error fetching specific products`, error.message);
+            throw error; // Pass error to the main catch block for fallback
+        }
+        
+        throw new Error(`User selector "${userSelector}" not found or insufficient products`);
+    }
+
+    // Auto-detection approach (fallback from your existing logic)
+    async function renderWithAutoDetection(productHandles) {
+        debugLog('Starting auto-detection approach...');
+        
+        const autoSelectors = [
+            '.card-wrapper.product-card-wrapper', // Dawn
+            '.card-wrapper', // Dawn variants
+            '.grid__item.product-item', // Horizon
+            '.product-item', // Generic
+            '.product-card', // Generic
+            '.grid__item', // Many themes
+            '.card', // Card-based themes
+            '[data-product-id]' // Data attribute based
+        ];
+        
+        // Try collection approach with auto-detection
+        const collectionUrl = `/collections/all?view=grid&limit=50`;
+        
+        // Construct a precise search URL for the exact product handles, just like the main function
+        const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+        const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product`;
+        
+        try {
+            debugLog(`Fetching specific products for auto-detection with URL: ${searchUrl}`);
+            const response = await fetch(searchUrl);
+            if (!response.ok) throw new Error(`Search fetch failed for auto-detection: ${response.status}`);
+            
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Try each common selector on the search results page
+            for (const selector of autoSelectors) {
+                const elements = doc.querySelectorAll(selector);
+                debugLog(`Testing auto-selector: "${selector}"`, {
+                    count: elements.length,
+                    hasProductLink: elements.length > 0 ? !!elements[0].querySelector('a[href*="/products/"]') : false
+                });
+                
+                // If we found any elements with this selector, it's a success
+                if (elements.length > 0) {
+                    const extractedCards = Array.from(elements).map(el => el.outerHTML);
+                    
+                    const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+                    carouselContainer.innerHTML = extractedCards.join('');
+                    applyCarouselStyling(carouselContainer);
+                    reinitializeThemeScripts(carouselContainer);
+                    
+                    debugLog('SUCCESS: Auto-detection worked', {
+                        selectedSelector: selector,
+                        extractedCount: extractedCards.length
+                    });
+                    
+                    return; // Exit after the first successful selector
+                }
+            }
+            
+            throw new Error('Auto-detection failed - no suitable selector found in search results');
+            
+        } catch (error) {
+            debugLog('Auto-detection failed', error.message);
+            throw error;
+        }
+    }
+
+    // Custom UI fallback
+    async function renderWithCustomUI(productHandles) {
+        debugLog('Starting custom UI fallback...');
+        
+        if (productHandles.length === 0) {
+            throw new Error('No product handles for custom UI');
+        }
+        
+        const productPromises = productHandles.map(async (handle) => {
+            try {
+                const response = await fetch(`/products/${handle}.js`);
+                return response.ok ? await response.json() : null;
+            } catch (error) {
+                debugLog(`Failed to fetch product: ${handle}`, error.message);
+                return null;
+            }
+        });
+
+        const products = (await Promise.all(productPromises)).filter(p => p !== null);
+        debugLog('Products fetched for custom UI', {
+            requested: productHandles.length,
+            received: products.length,
+            products: products.map(p => ({ id: p.id, title: p.title, handle: p.handle }))
+        });
+        
+        if (products.length === 0) {
+            throw new Error('Could not fetch any product data for custom UI');
+        }
+
+        const cardsHtml = products.map(product => {
+            const firstVariant = product.variants[0];
+            const price = firstVariant ? (firstVariant.price / 100).toFixed(2) : '0.00';
+            const compareAtPrice = firstVariant && firstVariant.compare_at_price ? (firstVariant.compare_at_price / 100).toFixed(2) : null;
+            const isOnSale = compareAtPrice && parseFloat(compareAtPrice) > parseFloat(price);
+            const featuredImage = product.featured_image || (product.images.length > 0 ? product.images[0] : null);
+            
+            return generateCustomCard(product, price, compareAtPrice, isOnSale, featuredImage);
+        }).join('');
+
+        const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+        carouselContainer.innerHTML = cardsHtml;
+        applyCarouselStyling(carouselContainer);
+        
+        debugLog('SUCCESS: Custom UI rendered', {
+            productsRendered: products.length
+        });
+    }
+
+    // Apply general carousel styling
+    function applyCarouselStyling(container) {
+        const carousel = container.querySelector('.couture-carousel') || container;
+        
+        // Make sure it's a horizontal scrollable carousel
+        if (carousel) {
+            carousel.style.display = 'flex';
+            carousel.style.overflowX = 'auto';
+            carousel.style.paddingBottom = '10px';
+            
+            // Ensure items don't shrink
+            const items = carousel.children;
+            for (let item of items) {
+                item.style.flexShrink = '0';
+                item.style.minWidth = '200px';
+            }
+        }
+        
+        debugLog('Carousel styling applied', {
+            carouselFound: !!carousel,
+            itemCount: carousel ? carousel.children.length : 0
+        });
+    }
+
+    // Generate custom card HTML
+    function generateCustomCard(product, price, compareAtPrice, isOnSale, featuredImage) {
+        return `
+            <div class="couture-custom-card" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; background: white; min-width: 200px;">
+                <div class="couture-custom-card__image" style="margin-bottom: 10px;">
+                    <a href="/products/${product.handle}">
+                        ${featuredImage ? `
+                            <img src="${featuredImage}?v=${product.id}&width=200" alt="${product.title}" 
+                                 style="width: 100%; height: 150px; object-fit: cover; border-radius: 4px;">
+                        ` : `
+                            <div style="width: 100%; height: 150px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: #666;">
+                                No Image
+                            </div>
+                        `}
+                    </a>
+                    ${isOnSale ? '<span style="position: absolute; top: 10px; left: 10px; background: red; color: white; padding: 2px 6px; font-size: 12px; border-radius: 3px;">Sale</span>' : ''}
+                </div>
+                <div class="couture-custom-card__info">
+                    <h4 style="margin: 0 0 5px 0; font-size: 14px;">
+                        <a href="/products/${product.handle}" style="text-decoration: none; color: #333;">${product.title}</a>
+                    </h4>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 5px;">${product.vendor}</div>
+                    <div style="font-weight: bold; color: #333;">
+                        ${isOnSale ? `
+                            <span style="text-decoration: line-through; color: #999; margin-right: 8px;">$${compareAtPrice}</span>
+                            <span style="color: #e74c3c;">$${price}</span>
+                        ` : `
+                            <span>$${price}</span>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Error message display
+    function showErrorMessage(errorMessage, productHandles) {
+        debugLog('Showing error message', { errorMessage, productHandles });
+        
+        const carouselContainer = document.getElementById('couture-carousel-{{ section.id }}');
+        if (carouselContainer) {
+            carouselContainer.innerHTML = `
+                <div style="padding: 20px; background: #fee; border: 1px solid #fcc; border-radius: 8px; font-size: 14px;">
+                    <h4 style="margin: 0 0 10px 0; color: #c33;">Could not load similar products</h4>
+                    <p><strong>Error:</strong> ${errorMessage}</p>
+                    <p><strong>Suggestion:</strong> Check your product selector setting and ensure it matches your theme's product card structure.</p>
+                    <details style="margin-top: 15px;">
+                        <summary style="cursor: pointer; color: #666;">Debug Information</summary>
+                        <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 4px;">
+                            <p><strong>Product Handles:</strong> ${productHandles ? productHandles.join(', ') : 'None'}</p>
+                            <p><strong>User Selector:</strong> ${document.getElementById('couture-container-{{ section.id }}').dataset.userSelector || 'Not set'}</p>
+                            <p><strong>Available Elements:</strong> Check console for structure analysis</p>
+                        </div>
+                    </details>
+                </div>
+            `;
+        }
+    }
+
+        function reinitializeThemeScripts(container) {
+            debugLog('Attempting to re-initialize theme scripts for hover effects...');
+            
+            // Dispatch a custom event that some themes listen for
+            document.dispatchEvent(new CustomEvent('shopify:section:load', {
+                bubbles: true,
+                detail: {
+                    sectionId: container.id
+                }
+            }));
+
+            // Manually trigger resize/scroll for themes that use those events
+            window.dispatchEvent(new Event('resize'));
+            window.dispatchEvent(new Event('scroll'));
+
+            debugLog('Theme script re-initialization signals sent.');
+        }
+
+        // Check if we're on a product page
+        const currentProductId = {{ product.id | json }};
+        if (!currentProductId) {
+            debugLog('ERROR: Not on a product page');
+            return;
+        }
+
+        debugLog('Initialization', {
+            currentProductId,
+            userProductSelector,
+            userContainerSelector,
+            debugMode
+        });
+
+        // Analyze current page structure
+        analyzePageStructure();
+
+        // API Configuration
+        const apiUrl = `http://127.0.0.1:8001/api/get-similar-product-ids?product_id=${currentProductId}`;
+        const apiKey = 'df2dc6b8360a3bf8ecca291e2c72ffdb';
+        const storeIdentifier = '{{ shop.permanent_domain }}';
+
+        try {
+            // Step 1: Get similar product handles from API
+            debugLog('Fetching similar products from API...');
+            const apiResponse = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-Api-Key': apiKey,
+                    'X-Store-Identifier': storeIdentifier
+                }
+            });
+
+            if (!apiResponse.ok) {
+                throw new Error(`API request failed: ${apiResponse.status}`);
+            }
+
+            const data = await apiResponse.json();
+            const productHandles = data.product_handles;
+
+            if (!productHandles || productHandles.length === 0) {
+                throw new Error('No similar products found');
+            }
+
+            debugLog('API Response received', { 
+                productHandlesCount: productHandles.length,
+                productHandles: productHandles 
+            });
+
+            // Step 2: Try user-configured approach
+            if (userProductSelector && userProductSelector.trim()) {
+                debugLog('Attempting user-configured approach...');
+                await renderWithUserSelector(productHandles, userProductSelector, userContainerSelector);
+            } else {
+                debugLog('No user selector provided, trying auto-detection...');
+                await renderWithAutoDetection(productHandles);
+            }
+
+        } catch (error) {
+            debugLog('ERROR in main flow', error.message);
+            console.error('Couture Similar Products Error:', error);
+            
+            // Ultimate fallback: Custom UI
+            debugLog('Falling back to custom UI...');
+            try {
+                await renderWithCustomUI(productHandles || []);
+            } catch (fallbackError) {
+                debugLog('FATAL: All approaches failed', fallbackError.message);
+                showErrorMessage(error.message, productHandles);
+            }
+        }
+        
+        debugLog('=== COUTURE USER-CONFIGURABLE APPROACH END ===');
+    });
+
+</script>
+
+{% schema %}
+{
+  "name": "Similar Products Carousel",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Couture Search App - User Configuration"
+    },
+    {
+      "type": "paragraph",
+      "content": "Configure this section to use your theme's native product card design. Enable debug mode to help identify the right selectors for your theme."
+    },
+    {
+      "type": "text",
+      "id": "section_title",
+      "label": "Section Title",
+      "default": "Similar Products"
+    },
+    {
+      "type": "text",
+      "id": "user_product_selector",
+      "label": "Product Card CSS Selector",
+      "info": "Enter the CSS selector for your theme's product cards (e.g., '.card-wrapper', '.product-item', '.grid__item'). Enable debug mode to help find this.",
+      "placeholder": ".card-wrapper"
+    },
+    {
+      "type": "text",
+      "id": "user_container_selector",
+      "label": "Container CSS Classes (Optional)",
+      "info": "CSS classes for the container that holds multiple product cards (e.g., 'grid product-grid'). Leave empty if not needed.",
+      "placeholder": "grid product-grid"
+    },
+    {
+      "type": "text",
+      "id": "source_url",
+      "label": "Product Card Source URL",
+      "info": "Provide a URL on your site that contains the full-featured product cards you want to copy. Usually '/' (for the homepage) or a specific collection URL.",
+      "default": "/search?q=a&type=product"
+    },
+    {
+      "type": "checkbox",
+      "id": "debug_mode",
+      "label": "Enable Debug Mode",
+      "info": "Shows detailed information about page structure and helps identify the right selectors for your theme.",
+      "default": false
+    },
+    {
+      "type": "header",
+      "content": "How to Find Your Selectors"
+    },
+    {
+      "type": "paragraph",
+      "content": "1. Enable debug mode above. 2. Check the debug panel that appears. 3. Look at your existing 'Related Products' or product grid sections. 4. Right-click on a product card → Inspect Element. 5. Copy the CSS selector (usually the class name with a dot, like '.card-wrapper')."
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+    .couture-similar-products-container {
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    .couture-similar-products-container h3 {
+        margin-bottom: 20px;
+        font-size: 24px;
+        font-weight: 500;
+    }
+
+    .couture-carousel-wrapper {
+        display: grid; /* Changed from grid for simplicity */
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #ccc transparent;
+    }
+
+    .couture-carousel-wrapper::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .couture-carousel-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .couture-carousel-wrapper::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+    }
+
+    .couture-carousel-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #999;
+    }
+
+    /* --- START OF THE FINAL, SIMPLIFIED FIX --- */
+
+    /* 1. Carousel Container: Simple flexbox setup. */
+    .couture-carousel {
+        display: flex;
+        padding-bottom: 20px; /* Extra space for scrollbar visibility */
+        margin: 0;
+        padding-left: 0;
+    }
+
+    /* 2. Card Item: Set a generous width and spacing. */
+    .couture-carousel > * {
+        flex: 0 0 280px; /* A wider, more stable card width */
+        list-style: none;
+        display: flex;
+        flex-direction: column; /* Ensures content stacks vertically */
+        padding: 0;
+        border: none;
+    }
+    
+    .couture-carousel > *:not(:last-child) {
+        margin-right: 30px; /* Generous spacing to match the desired look */
+    }
+
+    /* 3. The Image (THE NEW, SIMPLIFIED LOGIC): Style the <img> tag directly. */
+    /* This is the safest and most reliable way to control the image. */
+    .couture-carousel img {
+        display: block;
+        
+        /* The key fix: Set the aspect ratio directly on the image */
+        aspect-ratio: 4 / 5;
+        
+        /* Make the image fill the width of the card */
+        width: 100%;
+        height: auto; /* Height will be calculated automatically from the aspect ratio */
+        
+        /* Ensure the image content is cropped, not squished */
+        object-fit: cover;
+        
+        /* Add some space between the image and the text below it */
+        margin-bottom: 1rem;
+    }
+    
+    /* 4. Text Content: Clean up link styles and ensure visibility. */
+    .couture-carousel .card__content,
+    .couture-carousel .card-information,
+    .couture-carousel .product-card__info {
+        text-align: left; /* Or 'center' if you prefer */
+        padding: 0 5px; /* A little horizontal padding for the text */
+        text-decoration: none;
+    }
+    
+    .couture-carousel a {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    /* --- END OF THE FINAL, SIMPLIFIED FIX --- */
+
+</style>

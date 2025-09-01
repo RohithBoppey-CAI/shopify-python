@@ -2,3 +2,9 @@
 **/__pycache__/
 **/search-env/
 **/*.json
+
+# for development purposes
+**/*dummycouture*
+
+# remove any sqlite files
+**/*.db
