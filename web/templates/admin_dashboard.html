@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF--8" />
+    <title>Couture Admin Dashboard</title>
+
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+    
+    <script type="module">
+      // Import utilities from the App Bridge script
+      const { createApp } = window["app-bridge"];
+      const { Redirect } = window["app-bridge"].actions;
+
+      // These variables are injected by your Python/Jinja2 backend
+      const apiKey = "{{ SHOPIFY_API_KEY }}";
+      const shopOrigin = "{{ shop }}";
+      const host = "{{ host }}";
+
+      // Check if the required parameters are available
+      if (!apiKey || !shopOrigin || !host) {
+        console.error("Error: Missing API key, shop origin, or host for App Bridge initialization.");
+        return;
+      }
+      
+      // THE KEY STEP: The 'host' parameter from the URL is base64 encoded.
+      // It MUST be decoded before being used to initialize App Bridge.
+      const decodedHost = atob(host);
+
+      // Initialize the App Bridge
+      const app = createApp({
+        apiKey,
+        host: decodedHost,
+      });
+
+      console.log("✅ Shopify App Bridge Initialized Successfully!");
+       
+      // You can now use App Bridge. Example:
+      // const redirect = Redirect.create(app);
+      // redirect.dispatch(Redirect.Action.APP, '/some-path-in-your-app');
+    </script>
+  </head>
+  <body>
+    <h1>Welcome to the Couture Admin Dashboard</h1>
+    <p>Your app's main UI will go here.</p>
+    <p>
+      This page is now correctly authenticated and loaded inside the Shopify Admin.
+    </p>
+  </body>
+</html>
