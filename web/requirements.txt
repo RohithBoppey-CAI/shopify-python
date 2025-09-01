@@ -33,7 +33,6 @@ clickhouse-driver==0.2.9
 clickhouse-sqlalchemy==0.3.2
 ConfigArgParse==1.7
 contourpy==1.3.2
-couturesearch @ file:///Users/rohith.boppey/Documents/search%20console%20backend/couturesearch-0.1-py3-none-any.whl#sha256=3bd8e2ce2be1b3277bf6f49e7996231c8d60ee7019380f554c432cf5d53a7cac
 cramjam==2.10.0
 cryptography==44.0.3
 cycler==0.12.1
