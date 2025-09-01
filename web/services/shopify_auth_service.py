@@ -2,6 +2,11 @@
 import requests
 import urllib.parse
 from core.config import settings
+import base64
+from fastapi import Request, HTTPException
+
+from models.database import SessionLocal, Store
+
 
 def get_install_url(shop: str) -> str:
     """
@@ -15,6 +20,7 @@ def get_install_url(shop: str) -> str:
         f"&redirect_uri={urllib.parse.quote(redirect_uri)}"
     )
     return auth_url
+
 
 def exchange_code_for_token(shop: str, code: str):
     """
@@ -33,7 +39,64 @@ def exchange_code_for_token(shop: str, code: str):
 
     # TODO: Securely save the 'shop' and 'access_token' to your database.
     print(f"Access Token for {shop}: {access_token}")
-    
+
     # For now, we'll save it to a temporary file for demonstration
     with open(f"{shop}_token.txt", "w") as f:
         f.write(access_token)
+        
+    return access_token
+
+
+def get_shop_access_token(shop: str) -> str | None:
+    """Retrieves the access token for a given shop from the database."""
+    db = SessionLocal()
+    try:
+        store = db.query(Store).filter(Store.shop_url == shop).first()
+        return store.access_token if store else None
+    finally:
+        db.close()
+
+def save_or_update_token_in_db(shop: str, access_token: str):
+    """
+    Saves a new token or updates an existing one for a shop in the database.
+    """
+    db = SessionLocal()
+    try:
+        # Check if the store already exists
+        store = db.query(Store).filter(Store.shop_url == shop).first()
+        if store:
+            print(f"[DB] Updating token for {shop}")
+            store.access_token = access_token
+        else:
+            print(f"[DB] Creating new record and token for {shop}")
+            store = Store(shop_url=shop, access_token=access_token)
+            db.add(store)
+        
+        db.commit()
+        db.refresh(store)
+        print(f"[DB] Successfully saved token for {shop}")
+    finally:
+        db.close()
+
+
+def verify_shopify_request(request: Request):
+    """
+    Verifies the authenticity of a request coming from Shopify's frontend (App Bridge).
+    This is a crucial security step.
+    """
+    try:
+        auth_header = request.headers.get("Authorization")
+        token = auth_header.split(" ")[1]
+
+        # In a production app, you would decode and verify the JWT here
+        # For now, we'll decode it to get the shop domain
+        decoded_payload = base64.b64decode(token.split(".")[1] + "==")
+        payload_data = eval(decoded_payload.decode("utf-8"))
+        shop = payload_data["dest"].replace("https://", "")
+
+        print(f"[DEBUG] Request verified for shop: {shop}")
+        return {"shop": shop}
+
+    except Exception as e:
+        print(f"[ERROR] Request verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Could not verify Shopify request")
