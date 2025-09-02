@@ -3,7 +3,9 @@ import requests
 import urllib.parse
 from core.config import settings
 import base64
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, status
+import hmac
+import hashlib
 
 from models.database import SessionLocal, Store
 
@@ -43,7 +45,7 @@ def exchange_code_for_token(shop: str, code: str):
     # For now, we'll save it to a temporary file for demonstration
     with open(f"{shop}_token.txt", "w") as f:
         f.write(access_token)
-        
+
     return access_token
 
 
@@ -55,6 +57,7 @@ def get_shop_access_token(shop: str) -> str | None:
         return store.access_token if store else None
     finally:
         db.close()
+
 
 def save_or_update_token_in_db(shop: str, access_token: str):
     """
@@ -71,7 +74,7 @@ def save_or_update_token_in_db(shop: str, access_token: str):
             print(f"[DB] Creating new record and token for {shop}")
             store = Store(shop_url=shop, access_token=access_token)
             db.add(store)
-        
+
         db.commit()
         db.refresh(store)
         print(f"[DB] Successfully saved token for {shop}")
@@ -100,3 +103,54 @@ def verify_shopify_request(request: Request):
     except Exception as e:
         print(f"[ERROR] Request verification failed: {e}")
         raise HTTPException(status_code=401, detail="Could not verify Shopify request")
+
+
+def verify_hmac_signature(request: Request):
+    """
+    Verifies the HMAC signature of an incoming request from Shopify.
+    This is the standard way to authenticate non-embedded apps.
+    """
+    try:
+        query_string = request.url.query
+        query_params = urllib.parse.parse_qs(query_string)
+
+        # The hmac is the one query parameter we don't include in the calculation
+        hmac_from_shopify = query_params.get("hmac", [None])[0]
+        if not hmac_from_shopify:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing HMAC signature",
+            )
+
+        # Remove hmac and create the message string
+        params_for_signature = {k: v[0] for k, v in query_params.items() if k != "hmac"}
+
+        # Sort and encode
+        sorted_params = sorted(params_for_signature.items())
+        message = urllib.parse.urlencode(
+            sorted_params, safe=":/&=", quote_via=urllib.parse.quote
+        )
+
+        # Calculate our own signature
+        digest = hmac.new(
+            settings.SHOPIFY_APP_SECRET.encode("utf-8"),
+            message.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Compare signatures
+        if not hmac.compare_digest(digest, hmac_from_shopify):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid HMAC signature",
+            )
+
+        # If verification passes, return the shop name
+        return params_for_signature.get("shop")
+
+    except Exception as e:
+        print(f"[ERROR] HMAC verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not verify Shopify request",
+        )

@@ -21,9 +21,9 @@ def sync_reco_configurations(shop: str):
     print(f"[DEBUG] Using Metaobject Definition ID: {metaobject_definition_id}")
     
     # In a real app, this URL would also come from the settings
-    external_api_url = "http://host.docker.internal:8000/reco-config" # Placeholder
+    external_api_url = "http://localhost:8001/api/reco-config" # Placeholder
     print(f"[DEBUG] Calling external API at: {external_api_url}")
-    response = requests.get(external_api_url) # In a real app, add headers if needed
+    response = requests.post(external_api_url) # In a real app, add headers if needed
     response.raise_for_status()
     config_data = response.json()
     print(f"[DEBUG] Received {len(config_data.get('product_recos', []))} reco configs from API.")

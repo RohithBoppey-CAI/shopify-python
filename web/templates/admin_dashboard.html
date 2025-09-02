@@ -1,49 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF--8" />
-    <title>Couture Admin Dashboard</title>
+<head>
+    <meta charset="UTF-8">
+    <title>Couture App Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f4f6f8; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h1 { font-size: 24px; margin-bottom: 10px; }
+        p { color: #616161; margin-bottom: 25px; }
+        button { background-color: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #status-message { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; }
+        .status-success { background-color: #e6f4ea; color: #2d6a4f; }
+        .status-error { background-color: #fce8e6; color: #c5221f; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Configuration Sync</h1>
+        <p>Sync your dynamic banner and product carousel configurations from your central management system.</p>
+        <button id="sync-button">Sync Config</button>
+        <div id="status-message"></div>
+    </div>
 
-    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
-    
-    <script type="module">
-      // Import utilities from the App Bridge script
-      const { createApp } = window["app-bridge"];
-      const { Redirect } = window["app-bridge"].actions;
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const syncButton = document.getElementById('sync-button');
+            const statusMessage = document.getElementById('status-message');
+            
+            // Get the shop domain from the URL query parameters
+            const shopDomain = new URL(location.href).searchParams.get('shop');
 
-      // These variables are injected by your Python/Jinja2 backend
-      const apiKey = "{{ SHOPIFY_API_KEY }}";
-      const shopOrigin = "{{ shop }}";
-      const host = "{{ host }}";
+            syncButton.addEventListener('click', async function () {
+                syncButton.textContent = 'Syncing...';
+                syncButton.disabled = true;
+                statusMessage.style.display = 'none';
 
-      // Check if the required parameters are available
-      if (!apiKey || !shopOrigin || !host) {
-        console.error("Error: Missing API key, shop origin, or host for App Bridge initialization.");
-        return;
-      }
-      
-      // THE KEY STEP: The 'host' parameter from the URL is base64 encoded.
-      // It MUST be decoded before being used to initialize App Bridge.
-      const decodedHost = atob(host);
+                try {
+                    const response = await fetch('/sync-reco-config', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ shop: shopDomain })
+                    });
 
-      // Initialize the App Bridge
-      const app = createApp({
-        apiKey,
-        host: decodedHost,
-      });
+                    const result = await response.json();
 
-      console.log("✅ Shopify App Bridge Initialized Successfully!");
-       
-      // You can now use App Bridge. Example:
-      // const redirect = Redirect.create(app);
-      // redirect.dispatch(Redirect.Action.APP, '/some-path-in-your-app');
+                    if (!response.ok) {
+                        throw new Error(result.error || 'An unknown error occurred.');
+                    }
+
+                    statusMessage.textContent = result.message || 'Sync completed successfully!';
+                    statusMessage.className = 'status-success';
+                
+                } catch (error) {
+                    statusMessage.textContent = `Error: ${error.message}`;
+                    statusMessage.className = 'status-error';
+                } finally {
+                    statusMessage.style.display = 'block';
+                    syncButton.textContent = 'Sync Config';
+                    syncButton.disabled = false;
+                }
+            });
+        });
     </script>
-  </head>
-  <body>
-    <h1>Welcome to the Couture Admin Dashboard</h1>
-    <p>Your app's main UI will go here.</p>
-    <p>
-      This page is now correctly authenticated and loaded inside the Shopify Admin.
-    </p>
-  </body>
+</body>
 </html>

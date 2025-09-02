@@ -172,6 +172,7 @@ class ShopifyAPIClient:
             }
         }
         response = self._execute_query(create_mutation, variables)
+        print(response)
         new_definition = (
             response.get("data", {})
             .get("metaobjectDefinitionCreate", {})
