@@ -65,6 +65,7 @@ def save_or_update_token_in_db(shop: str, access_token: str):
     """
     db = SessionLocal()
     try:
+        print("Saving token in DB")
         # Check if the store already exists
         store = db.query(Store).filter(Store.shop_url == shop).first()
         if store:

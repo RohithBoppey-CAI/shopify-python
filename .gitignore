@@ -2,6 +2,7 @@
 **/__pycache__/
 **/search-env/
 **/*.json
+!package.json
 
 # for development purposes
 **/*dummycouture*

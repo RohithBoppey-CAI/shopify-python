@@ -1,6 +1,7 @@
 import requests
 import json
 
+
 def read_jsonl_from_url(url):
     all_objects = []
     try:
@@ -19,3 +20,19 @@ def read_jsonl_from_url(url):
     except Exception as e:
         print(f"Connection error: {e}")
         return []
+
+
+def return_dummy_handlers():
+    x = [
+        "proteus-fitness-jackshirt",
+        "chaz-kangeroo-hoodie",
+        "teton-pullover-hoodie",
+        "bruno-complete-hoodie",
+        "frankie-sweatshirt",
+        "grayson-crewneck-sweatshirt",
+        "mach-street-sweatshirt",
+        "hyperion-elements-jacket",
+        "beaumont-summit-kit",
+        "jupiter-all-weather-trainer",
+    ]
+    return {"product_handles": x}

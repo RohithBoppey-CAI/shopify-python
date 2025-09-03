@@ -192,13 +192,15 @@ class ShopifyAPIClient:
             )
             raise Exception(f"Could not create metaobject definition: {errors}")
 
+    # In web/models/shopify_client.py
+
     def upsert_metaobject(self, definition_id: str, reco_data: dict) -> str:
         """
         Creates or updates a Metaobject entry for a specific product carousel.
         """
-        handle = reco_data['banner_name'].lower().replace(' ', '-')
+        handle = reco_data["banner_name"].lower().replace(" ", "-")
         print(f"[DEBUG] Upserting metaobject for handle: {handle}")
-        
+
         mutation = """
             mutation metaobjectUpsert($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
                 metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
@@ -215,26 +217,34 @@ class ShopifyAPIClient:
             }
         """
         variables = {
-            "handle": {
-                "type": "couture_product_carousel",
-                "handle": handle
-            },
+            "handle": {"type": "couture_product_carousel", "handle": handle},
             "metaobject": {
-                "definitionId": definition_id,
                 "fields": [
-                    {"key": "name", "value": reco_data.get('banner_name')},
-                    {"key": "caption", "value": reco_data.get('caption')},
-                    {"key": "endpoint", "value": reco_data.get('endpoint')},
-                    {"key": "enabled_default", "value": str(reco_data.get('enabled', False)).lower()}
+                    {"key": "name", "value": reco_data.get("banner_name")},
+                    {"key": "caption", "value": reco_data.get("caption")},
+                    {"key": "endpoint", "value": reco_data.get("endpoint")},
+                    {
+                        "key": "enabled_default",
+                        "value": str(reco_data.get("enabled", False)).lower(),
+                    },
                 ]
-            }
+            },
         }
+
         response = self._execute_query(mutation, variables)
+
+        print(response)
+
+        # Check if the API call itself had top-level errors
+        if "errors" in response:
+            print(f"[ERROR] GraphQL query failed: {response['errors']}")
+            return "failed"
+
         upsert_data = response.get("data", {}).get("metaobjectUpsert", {})
-        
-        if upsert_data.get("metaobject"):
-            return 'updated' if upsert_data["metaobject"]["updatedAt"] else 'created'
+
+        if upsert_data and upsert_data.get("metaobject"):
+            return "updated"
         else:
             errors = upsert_data.get("userErrors", [])
             print(f"[ERROR] Failed to upsert metaobject '{handle}': {errors}")
-            return 'failed'
+            return "failed"

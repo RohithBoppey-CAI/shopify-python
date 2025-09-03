@@ -2,16 +2,16 @@
 
 name = "Couture Search and Recos"
 client_id = "8ba440c9bab74a1414d838c129248691"
-application_url = "https://80716e0fe095.ngrok-free.app/admin"
+application_url = "https://956976927a59.ngrok-free.app/admin"
 embedded = false
 
 [access_scopes]
 # Scopes your app needs. Ensure they match your .env file.
-scopes = "read_products,read_orders"
+scopes = "read_products,read_orders,write_metaobject_definitions,read_metaobjects,write_metaobjects"
 
 [auth]
 redirect_urls = [
-    "https://80716e0fe095.ngrok-free.app/auth/callback"
+    "https://956976927a59.ngrok-free.app/auth/callback"
 ]
 
 [webhooks]

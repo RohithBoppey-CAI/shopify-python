@@ -1,0 +1,313 @@
+{% comment %}
+  FINAL COMBINED VERSION
+  - Data Source: Dynamically configured using Metaobjects for flexibility.
+  - Rendering: Uses the advanced theme-scraping engine to perfectly match your theme's product card style.
+  - Behavior: Renders a clean, horizontally-scrolling carousel without causing page overflow.
+{% endcomment %}
+
+{% liquid
+  assign carousel_handle = section.settings.carousel_metaobject_handle
+  assign carousel_config = nil
+  for item in shop.metaobjects['couture_product_carousel'].values
+    if item.handle == carousel_handle
+      assign carousel_config = item
+      break
+    endif
+  endfor
+%}
+
+{% if carousel_config != blank %}
+<div
+  class="couture-carousel-section page-width"
+  id="couture-container-{{ section.id }}"
+  data-section-id="{{ section.id }}"
+  data-api-endpoint="{{ carousel_config.endpoint.value }}"
+  data-user-selector="{{ section.settings.user_product_selector }}"
+  data-debug-mode="{{ section.settings.debug_mode }}"
+>
+  {% comment %} Section Header from Metaobject {% endcomment %}
+  <h3 class="h2" style="text-align: left;">
+    {{ carousel_config.name.value | default: 'Featured Products' }}
+  </h3>
+  {% comment %} <p style="text-align: left;">
+    {{ carousel_config.caption.value }}
+  </p> {% endcomment %}
+  
+  {% if section.settings.debug_mode %}
+  <div class="couture-debug-panel" style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-size: 12px;">
+      <strong>Debug Information:</strong>
+      <p><strong>Metaobject Handle:</strong> {{ carousel_handle }}</p>
+      <p><strong>API Endpoint:</strong> {{ carousel_config.endpoint.value }}</p>
+      <p><strong>User Product Selector:</strong> {{ section.settings.user_product_selector | default: 'Not set' }}</p>
+      <div id="debug-log-{{ section.id }}"></div>
+  </div>
+  {% endif %}
+  
+  {% comment %} This wrapper will contain the horizontally scrollable products {% endcomment %}
+  <div class="couture-carousel-wrapper" id="couture-carousel-wrapper-{{ section.id }}">
+      <div class="couture-carousel" id="couture-carousel-{{ section.id }}">
+          <p>Loading products...</p>
+      </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener('DOMContentLoaded', async function () {
+    const container = document.getElementById('couture-container-{{ section.id }}');
+    if (!container) return;
+
+    // --- Configuration now comes from metaobjects and section settings via data attributes ---
+    const sectionId = container.dataset.sectionId;
+    const apiUrl = container.dataset.apiEndpoint;
+    const userProductSelector = container.dataset.userSelector;
+    const debugMode = container.dataset.debugMode === 'true';
+    
+    // --- Helper Functions from app_embed.liquid (unchanged) ---
+
+    function debugLog(message, data = null) {
+        if (!debugMode) return;
+        console.log(`[COUTURE DEBUG ${sectionId}] ${message}`, data || '');
+        const debugPanel = document.getElementById('debug-log-' + sectionId);
+        if (debugPanel) {
+            const logEntry = document.createElement('div');
+            logEntry.style.cssText = 'margin-top: 5px; padding: 5px; background: #fff; border: 1px solid #ddd;';
+            logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}${data ? `<pre style="font-size: 11px; white-space: pre-wrap;">${JSON.stringify(data, null, 2)}</pre>` : ''}`;
+            debugPanel.appendChild(logEntry);
+        }
+    }
+
+    async function renderByScraping(productHandles, selector) {
+        debugLog('Attempting to render via scraping', { selector, handleCount: productHandles.length });
+        const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+        const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product`;
+
+        const response = await fetch(searchUrl);
+        if (!response.ok) throw new Error(`Search request failed: ${response.status}`);
+        
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const productElements = doc.querySelectorAll(selector);
+
+        if (productElements.length === 0) throw new Error(`Selector "${selector}" not found in search results page.`);
+
+        const extractedCards = Array.from(productElements).map(el => el.outerHTML);
+        document.getElementById('couture-carousel-' + sectionId).innerHTML = extractedCards.join('');
+        
+        debugLog('SUCCESS: Scraping successful', { foundElements: productElements.length });
+    }
+
+    async function renderWithAutoDetection(productHandles) {
+        debugLog('No user selector provided, starting auto-detection...');
+        const autoSelectors = ['.card-wrapper', '.product-card', '.product-item', '.grid__item', '.card'];
+        for (const selector of autoSelectors) {
+            try {
+                await renderByScraping(productHandles, selector);
+                debugLog(`Auto-detection successful with selector: "${selector}"`);
+                return;
+            } catch (error) {
+                debugLog(`Auto-detection failed for selector "${selector}", trying next.`);
+            }
+        }
+        throw new Error('Auto-detection failed. No suitable product card selector found.');
+    }
+
+    function showErrorMessage(errorMessage) {
+        debugLog('FATAL ERROR:', { message: errorMessage });
+        const carouselContainer = document.getElementById('couture-carousel-' + sectionId);
+        if (carouselContainer) {
+            carouselContainer.innerHTML = `<p style="color: red; padding: 20px; border: 1px solid #ffdddd; background: #fff5f5;"><strong>Error:</strong> Could not load products. ${errorMessage}</p>`;
+        }
+    }
+
+    function applyCarouselStyling(container) {
+        debugLog('Applying carousel styling');
+        const carousel = container;
+        if (carousel) {
+            carousel.style.display = 'flex';
+            carousel.style.overflowX = 'auto';
+            carousel.style.paddingBottom = '10px';
+            
+            const items = carousel.children;
+            for (let item of items) {
+                item.style.flexShrink = '0';
+                item.style.minWidth = '200px';
+            }
+        }
+        debugLog('Carousel styling applied', { itemCount: carousel ? carousel.children.length : 0 });
+    }
+
+    function reinitializeThemeScripts(container) {
+        debugLog('Reinitializing theme scripts');
+        document.dispatchEvent(new CustomEvent('shopify:section:load', {
+            bubbles: true,
+            detail: {
+                sectionId: container.id
+            }
+        }));
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('scroll'));
+        debugLog('Theme script reinitialization complete');
+    }
+
+    // --- MAIN EXECUTION ---
+    try {
+        debugLog('Starting execution', { apiUrl, userProductSelector });
+
+        if (!apiUrl) {
+            throw new Error('API Endpoint is missing. Check Metaobject configuration.');
+        }
+
+        // 1. Fetch product handles from the dynamic API endpoint
+        const handleResponse = await fetch(apiUrl, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        if (!handleResponse.ok) throw new Error(`API request failed with status: ${handleResponse.status}`);
+        
+        const handleData = await handleResponse.json();
+        const productHandles = handleData.product_handles;
+        if (!productHandles || productHandles.length === 0) {
+            document.getElementById('couture-carousel-' + sectionId).innerHTML = `<p>No products to display.</p>`;
+            debugLog('API returned no product handles. Halting execution.');
+            return;
+        }
+
+        debugLog('Received handles from API', { count: productHandles.length, handles: productHandles });
+
+        // 2. Render products by scraping theme, with auto-detection as a fallback
+        if (userProductSelector && userProductSelector.trim()) {
+            await renderByScraping(productHandles, userProductSelector);
+        } else {
+            await renderWithAutoDetection(productHandles);
+        }
+
+        // 3. Apply additional styling and reinitialize scripts (added from app_embed)
+        const carouselContainer = document.getElementById('couture-carousel-' + sectionId);
+        applyCarouselStyling(carouselContainer);
+        reinitializeThemeScripts(carouselContainer);
+        
+        debugLog('Render process completed successfully.');
+
+    } catch (error) {
+        showErrorMessage(error.message);
+    }
+});
+</script>
+
+{% schema %}
+{
+  "name": "Couture Product Carousel",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "1. Content Source"
+    },
+    {
+      "type": "text",
+      "id": "carousel_metaobject_handle",
+      "label": "Carousel Metaobject Handle",
+      "info": "This determines the title, caption, and which collection of products to display. Find handles under Content > Metaobjects in your Shopify admin.",
+      "default": "new-products"
+    },
+    {
+      "type": "header",
+      "content": "2. Appearance (Advanced)"
+    },
+    {
+      "type": "paragraph",
+      "content": "This section scrapes your theme's existing product card design for a perfect match. For best results, enter your theme's specific CSS selector. Leave blank to auto-detect."
+    },
+    {
+      "type": "text",
+      "id": "user_product_selector",
+      "label": "Product Card CSS Selector (Optional)",
+      "info": "Example: '.card-wrapper' or '.product-item'. Use your browser's 'Inspect Element' tool on a product grid to find the right selector.",
+      "placeholder": ".card-wrapper"
+    },
+    {
+      "type": "header",
+      "content": "3. Debugging"
+    },
+    {
+      "type": "checkbox",
+      "id": "debug_mode",
+      "label": "Enable Debug Mode",
+      "info": "Shows a debug panel with detailed logs to help with setup and troubleshooting.",
+      "default": false
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+    /* * --- FINAL FIX ---
+     * This more robust CSS is designed to override theme conflicts and
+     * ensure the carousel scrolls internally without affecting the page layout.
+    */
+
+    /* This wrapper div makes the horizontal scroll work correctly */
+    .couture-carousel-wrapper {
+        display: grid; /* This is key for containing the flexbox child */
+        grid-template-columns: 100%; /* Explicitly define a single column */
+        overflow-x: auto;
+        padding-bottom: 20px; /* Space for the scrollbar */
+        scrollbar-width: thin; /* For Firefox */
+        scrollbar-color: #ccc transparent; /* For Firefox */
+    }
+
+    /* Webkit scrollbar styling */
+    .couture-carousel-wrapper::-webkit-scrollbar {
+        height: 8px;
+    }
+    .couture-carousel-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .couture-carousel-wrapper::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 4px;
+    }
+    .couture-carousel-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #999;
+    }
+
+    /* This div holds the product cards themselves */
+    .couture-carousel {
+        display: flex;
+        flex-wrap: nowrap; /* Ensures items stay in a single line */
+        padding-left: 0;
+        margin: 0;
+    }
+
+    /* This targets each product card that the scraping logic inserts. */
+    .couture-carousel > * {
+        flex: 0 0 280px; /* Don't grow, don't shrink, base width of 280px */
+        width: 280px;
+    }
+
+    /* Using margin for spacing, just like the working example */
+    .couture-carousel > *:not(:last-child) {
+        margin-right: 30px;
+    }
+
+    /* Additional image and content styles from app_embed for consistency */
+    .couture-carousel img {
+        display: block;
+        aspect-ratio: 4 / 5;
+        width: 100%;
+        height: auto;
+        object-fit: cover;
+        margin-bottom: 1rem;
+    }
+    
+    .couture-carousel .card__content,
+    .couture-carousel .card-information,
+    .couture-carousel .product-card__info {
+        text-align: left;
+        padding: 0 5px;
+        text-decoration: none;
+    }
+    
+    .couture-carousel a {
+        text-decoration: none;
+        color: inherit;
+    }
+</style>
