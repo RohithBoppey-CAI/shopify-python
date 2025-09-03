@@ -22,22 +22,22 @@
   id="couture-container-{{ section.id }}"
   data-section-id="{{ section.id }}"
   data-api-endpoint="{{ carousel_config.endpoint.value }}"
-  data-user-selector="{{ section.settings.user_product_selector }}"
-  data-debug-mode="{{ section.settings.debug_mode }}"
+  data-user-selector="{{ block.settings.user_product_selector }}"
+  data-debug-mode="{{ block.settings.debug_mode }}"
+  data-carousel-handle="{{ block.settings.carousel_metaobject_handle | default: 'new-products' }}"
 >
   {% comment %} Section Header from Metaobject {% endcomment %}
   <h3 class="h2" style="text-align: left;">
-    {{ carousel_config.name.value | default: 'Featured Products' }}
+    {{ block.settings.carousel_metaobject_handle | default: 'Featured Products' | replace: '-', ' ' | capitalize }}
   </h3>
   {% comment %} <p style="text-align: left;">
     {{ carousel_config.caption.value }}
   </p> {% endcomment %}
   
-  {% if section.settings.debug_mode %}
+  {% if block.settings.debug_mode %}
   <div class="couture-debug-panel" style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-size: 12px;">
       <strong>Debug Information:</strong>
       <p><strong>Metaobject Handle:</strong> {{ carousel_handle }}</p>
-      <p><strong>API Endpoint:</strong> {{ carousel_config.endpoint.value }}</p>
       <p><strong>User Product Selector:</strong> {{ section.settings.user_product_selector | default: 'Not set' }}</p>
       <div id="debug-log-{{ section.id }}"></div>
   </div>
@@ -57,13 +57,34 @@ document.addEventListener('DOMContentLoaded', async function () {
     const container = document.getElementById('couture-container-{{ section.id }}');
     if (!container) return;
 
+    function toKebabCase(text) {
+        return text.trim().toLowerCase().replace(/\s+/g, "-");
+    }
+
     // --- Configuration now comes from metaobjects and section settings via data attributes ---
     const sectionId = container.dataset.sectionId;
-    const apiUrl = container.dataset.apiEndpoint;
     const userProductSelector = container.dataset.userSelector;
     const debugMode = container.dataset.debugMode === 'true';
     
+    const handle = container.dataset.carouselHandle;
+    console.log(handle)
+
+    const allCarousels = {{ shop.metaobjects['couture_product_carousel'].values | json }};
+    console.log(allCarousels)
+
+    const chosen = allCarousels.find(item => toKebabCase(item.name) === handle);
+    console.log(chosen)
+
+    const apiUrl = chosen ? chosen.endpoint : null;
+    console.log(apiUrl)
+
     // --- Helper Functions from app_embed.liquid (unchanged) ---
+     const sectionSettings = {
+        "carousel_metaobject_handle": {{ block.settings.carousel_metaobject_handle | json }},
+        "user_product_selector": {{ block.settings.user_product_selector | json }},
+        "debug_mode": {{ block.settings.debug_mode | json }}
+    };
+
 
     function debugLog(message, data = null) {
         if (!debugMode) return;
@@ -153,6 +174,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     // --- MAIN EXECUTION ---
     try {
         debugLog('Starting execution', { apiUrl, userProductSelector });
+        debugLog('Configuration', sectionSettings);
 
         if (!apiUrl) {
             throw new Error('API Endpoint is missing. Check Metaobject configuration.');
