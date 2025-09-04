@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, HTTPException
+from fastapi import FastAPI, Request, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -86,22 +86,6 @@ async def auth_callback(request: Request):
     return RedirectResponse(url=final_admin_url)
 
 
-@app.post("/api/products/sync")
-async def trigger_product_sync(request: Request):
-    """API endpoint to manually trigger a full product catalogue sync."""
-    data = await request.json()
-    shop = data.get("shop")
-    result = trigger_initial_product_sync(shop=shop)
-    return result
-
-
-@app.get("/api/sync/status")
-async def get_sync_status(shop: str):
-    """API endpoint to check the status of the latest bulk operation."""
-    status = get_last_sync_status(shop=shop)
-    return status
-
-
 @app.get("/admin", response_class=HTMLResponse)
 def admin_dashboard(request: Request, shop: str = Depends(verify_hmac_signature)):
     """Serves the main admin dashboard UI for the app, protected by HMAC verification."""
@@ -156,8 +140,40 @@ async def proxy_reco_request(reco_path: str, product_id: int):
             )
 
 
+@app.post("/sync-reco-config")
+async def sync_config(sync_request: SyncRequest):
+    """Handles the AJAX request and logs the sync result."""
+    shop = sync_request.shop
+    access_token = get_shop_access_token(shop)
+    if not access_token:
+        return {"error": f"Could not find access token for shop {shop}"}, 400
+
+    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+    try:
+        result = sync_reco_configurations(shop, client)  # Pass the client in
+        message = f"Sync successful! {result['created']} created, {result['updated']} updated."
+
+        # Log the successful result
+        client.update_sync_history(
+            key="reco_config_sync", status="success", message=message
+        )
+
+        return {"message": message}
+
+    except Exception as e:
+        error_message = f"Sync failed: {str(e)}"
+
+        # Log the error
+        client.update_sync_history(
+            key="reco_config_sync", status="error", message=error_message
+        )
+
+        return {"error": str(e)}, 500
+
+
 @app.get("/get-sync-history")
-async def get_sync_history(shop: str):
+async def get_reco_sync_history(shop: str):
     """
     Fetches the sync history log, which is stored in a shop metafield.
     This endpoint is called by the admin dashboard on page load.
@@ -171,9 +187,8 @@ async def get_sync_history(shop: str):
         client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
 
         # 2. Fetch the specific metafield where we store the history
-        # The namespace and key must match what's used in the update_sync_history function
         history_metafield = client.get_metafield(
-            namespace="couture_app", key="sync_history"
+            namespace="couture_app", key="reco_config_sync"
         )
 
         # 3. Handle cases where no history exists yet
@@ -191,10 +206,14 @@ async def get_sync_history(shop: str):
         return {"error": f"Failed to retrieve sync history: {str(e)}"}, 500
 
 
-@app.post("/sync-reco-config")
-async def sync_config(sync_request: SyncRequest):
-    """Handles the AJAX request and logs the sync result."""
-    shop = sync_request.shop
+@app.post("/api/products/sync")
+async def trigger_product_sync(request: Request, background_tasks: BackgroundTasks):
+    """API endpoint to manually trigger a full product catalogue sync."""
+    data = await request.json()
+    shop = data.get("shop")
+    if not shop:
+        return {"error": "Shop domain is required."}, 400
+
     access_token = get_shop_access_token(shop)
     if not access_token:
         return {"error": f"Could not find access token for shop {shop}"}, 400
@@ -202,18 +221,56 @@ async def sync_config(sync_request: SyncRequest):
     client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
 
     try:
-        result = sync_reco_configurations(shop, client)  # Pass the client in
-        message = f"Sync successful! {result['created']} created, {result['updated']} updated."
+        # 1. Log the "processing" state immediately
+        client.update_sync_history(
+            key="catalogue_sync_history",
+            status="processing",
+            message="Full catalogue sync initiated by user.",
+        )
 
-        # Log the successful result
-        client.update_sync_history(status="success", message=message)
+        # background_tasks.add_task(run_bulk_product_sync, shop, client)
 
-        return {"message": message}
+        trigger_initial_product_sync(shop)
+
+        return {"message": "Product catalogue sync completed successfully."}
 
     except Exception as e:
-        error_message = f"Sync failed: {str(e)}"
+        error_message = f"Catalogue sync failed: {str(e)}"
 
-        # Log the error
-        client.update_sync_history(status="error", message=error_message)
+        # 4. Log the "error" state if something goes wrong
+        client.update_sync_history(
+            key="catalogue_sync_history", status="error", message=error_message
+        )
+        return {"error": error_message}, 500
 
-        return {"error": str(e)}, 500
+
+@app.get("/get-catalogue-sync-history")
+async def get_catalogue_sync_history(shop: str):
+    """Fetches the catalogue sync history from a shop metafield."""
+    try:
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+        # Note the new, specific key for this history log
+        history_metafield = client.get_metafield(
+            namespace="couture_app", key="catalogue_sync_history"
+        )
+
+        if not history_metafield or not history_metafield.get("value"):
+            return {"history": []}
+
+        history = json.loads(history_metafield["value"])
+        return {"history": history}
+
+    except Exception as e:
+        return {"error": f"Failed to get history: {str(e)}"}, 500
+
+
+@app.get("/api/sync/status")
+async def get_sync_status(shop: str):
+    """API endpoint to check the status of the latest bulk operation."""
+    status = get_last_sync_status(shop=shop)
+    return status

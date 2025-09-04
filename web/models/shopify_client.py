@@ -85,33 +85,63 @@ class ShopifyAPIClient:
         response = self._execute_query(query, variables)
         return response["data"]["shop"]["metafield"]
 
-    def update_sync_history(self, status: str, message: str):
-        """Gets, updates, and sets the sync history metafield."""
-        # 1. Get existing history
+    def update_sync_history(
+        self,
+        key: str,
+        status: str,
+        message: str,
+        update_latest_processing: bool = False,
+    ):
+        """
+        Gets, updates, and sets a specific sync history metafield.
+
+        If update_latest_processing is True, it finds and updates the most
+        recent 'processing' record. Otherwise, it prepends a new record.
+        """
+        # 1. Get existing history from the metafield
         existing_history_metafield = self.get_metafield(
-            namespace="couture_app", key="sync_history"
+            namespace="couture_app", key=key
         )
         history = []
         if existing_history_metafield and existing_history_metafield.get("value"):
             history = json.loads(existing_history_metafield["value"])
 
-        # 2. Create and prepend new log entry
-        new_log = {
-            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
-            "status": status,
-            "message": message,
-        }
-        history.insert(0, new_log)
+        if update_latest_processing:
+            # Find the first record with "processing" status and update it.
+            updated = False
+            for log in history:
+                if log.get("status") == "processing":
+                    log["status"] = status
+                    log["message"] = message
+                    # Update the timestamp to reflect the completion time
+                    log["timestamp"] = datetime.datetime.now(timezone.utc).isoformat()
+                    updated = True
+                    break  # Stop after updating the first one
 
-        # 3. Limit to the last 10 entries
+            # If for some reason no "processing" log was found, add a new entry as a fallback.
+            if not updated:
+                new_log = {
+                    "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+                    "status": status,
+                    "message": message,
+                }
+                history.insert(0, new_log)
+        else:
+            # --- PREPEND LOGIC (for initiating the sync) ---
+            new_log = {
+                "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+                "status": status,
+                "message": message,
+            }
+            history.insert(0, new_log)
+
         limited_history = history[:10]
 
-        # 4. Prepare the metafieldsSet mutation
         shop_gid = self.get_shop_gid()
         metafield_input = {
             "ownerId": shop_gid,
             "namespace": "couture_app",
-            "key": "sync_history",
+            "key": key,
             "type": "json_string",
             "value": json.dumps(limited_history),
         }
@@ -119,13 +149,8 @@ class ShopifyAPIClient:
         mutation = """
         mutation($metafields: [MetafieldsSetInput!]!) {
             metafieldsSet(metafields: $metafields) {
-                metafields {
-                    id
-                }
-                userErrors {
-                    field
-                    message
-                }
+                metafields { id }
+                userErrors { field message }
             }
         }
         """

@@ -30,8 +30,6 @@ def trigger_initial_product_sync(shop: str) -> dict:
     print(f"Triggering background catalogue download for the shop {shop}")
     result = client.fetch_all_products(wait=False)
 
-    # TODO: Save the operation ID and status to your database.
-
     return result
 
 
@@ -48,5 +46,12 @@ def get_last_sync_status(shop: str) -> dict:
         products = read_jsonl_from_url(status["url"])
         save_to_json(filename=f"{shop}_products.jsonl", data_dict=products)
         # TODO: Update the status in your database to "Completed".
+
+    client.update_sync_history(
+        key="catalogue_sync_history",
+        status="success",
+        message="Sync complete",
+        update_latest_processing=True,
+    )
 
     return status
