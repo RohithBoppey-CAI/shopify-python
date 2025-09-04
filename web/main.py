@@ -1,11 +1,9 @@
-import os
-import uvicorn
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-
+import json
+from datetime import timezone
 from core.config import settings
 from services.shopify_auth_service import get_install_url, verify_hmac_signature
 from services.shopify_auth_service import (
@@ -19,7 +17,7 @@ from services.shopify_product_service import (
 )
 from services.shopify_config_service import sync_reco_configurations
 from models.database import create_db_and_tables
-
+from models import ShopifyAPIClient
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
 from utils.commons.api_utils import return_dummy_handlers
@@ -34,6 +32,7 @@ class SyncRequest(BaseModel):
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+
 
 origins = [
     "https://dummycouture.myshopify.com",
@@ -157,14 +156,64 @@ async def proxy_reco_request(reco_path: str, product_id: int):
             )
 
 
+@app.get("/get-sync-history")
+async def get_sync_history(shop: str):
+    """
+    Fetches the sync history log, which is stored in a shop metafield.
+    This endpoint is called by the admin dashboard on page load.
+    """
+    try:
+        # 1. Authenticate and create an API client for the specific shop
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token for the shop.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+        # 2. Fetch the specific metafield where we store the history
+        # The namespace and key must match what's used in the update_sync_history function
+        history_metafield = client.get_metafield(
+            namespace="couture_app", key="sync_history"
+        )
+
+        # 3. Handle cases where no history exists yet
+        if not history_metafield or not history_metafield.get("value"):
+            return {"history": []}
+
+        # 4. The metafield's value is a JSON string; parse it into a Python list
+        history = json.loads(history_metafield["value"])
+
+        # 5. Return the list to the frontend
+        return {"history": history}
+
+    except Exception as e:
+        # Return a clear error if anything goes wrong
+        return {"error": f"Failed to retrieve sync history: {str(e)}"}, 500
+
+
 @app.post("/sync-reco-config")
 async def sync_config(sync_request: SyncRequest):
-    """Handles the AJAX request from the 'Sync Config' button in the admin dashboard."""
+    """Handles the AJAX request and logs the sync result."""
     shop = sync_request.shop
+    access_token = get_shop_access_token(shop)
+    if not access_token:
+        return {"error": f"Could not find access token for shop {shop}"}, 400
+
+    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
     try:
-        result = sync_reco_configurations(shop)
-        return {
-            "message": f"Sync successful! {result['created']} created, {result['updated']} updated."
-        }
+        result = sync_reco_configurations(shop, client)  # Pass the client in
+        message = f"Sync successful! {result['created']} created, {result['updated']} updated."
+
+        # Log the successful result
+        client.update_sync_history(status="success", message=message)
+
+        return {"message": message}
+
     except Exception as e:
+        error_message = f"Sync failed: {str(e)}"
+
+        # Log the error
+        client.update_sync_history(status="error", message=error_message)
+
         return {"error": str(e)}, 500

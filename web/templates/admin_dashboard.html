@@ -1,70 +1,306 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Couture App Dashboard</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f4f6f8; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        h1 { font-size: 24px; margin-bottom: 10px; }
-        p { color: #616161; margin-bottom: 25px; }
-        button { background-color: #007bff; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; transition: background-color 0.2s; }
-        button:hover { background-color: #0056b3; }
-        button:disabled { background-color: #cccccc; cursor: not-allowed; }
-        #status-message { margin-top: 20px; padding: 15px; border-radius: 5px; display: none; }
-        .status-success { background-color: #e6f4ea; color: #2d6a4f; }
-        .status-error { background-color: #fce8e6; color: #c5221f; }
+        :root {
+            --polar-night-1: #2E3440;
+            --polar-night-2: #3B4252;
+            --polar-night-3: #434C5E;
+            --polar-night-4: #4C566A;
+            --snow-storm-1: #D8DEE9;
+            --snow-storm-2: #E5E9F0;
+            --snow-storm-3: #ECEFF4;
+            --frost-1: #8FBCBB;
+            --frost-2: #88C0D0;
+            --frost-3: #81A1C1;
+            --frost-4: #5E81AC;
+            --aurora-1: #BF616A;
+            --aurora-2: #D08770;
+            --aurora-3: #EBCB8B;
+            --aurora-4: #A3BE8C;
+            --aurora-5: #B48EAD;
+            --border-radius: 8px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: var(--snow-storm-2);
+            color: var(--polar-night-1);
+        }
+
+        .header {
+            background-color: white;
+            padding: 20px 40px;
+            border-bottom: 1px solid var(--snow-storm-1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            margin: 0;
+            color: var(--polar-night-1);
+        }
+
+        .main-container {
+            padding: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--snow-storm-1);
+            margin-bottom: 30px;
+        }
+
+        .tab-link {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            border: none;
+            background: none;
+            color: var(--polar-night-4);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+
+        .tab-link.active {
+            color: var(--frost-4);
+            border-bottom-color: var(--frost-4);
+        }
+
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-top: 0;
+            margin-bottom: 10px;
+            border-bottom: 1px solid var(--snow-storm-1);
+            padding-bottom: 10px;
+        }
+
+        .card p {
+            color: var(--polar-night-4);
+            margin-bottom: 25px;
+        }
+
+        button {
+            background-color: var(--frost-4);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--polar-night-2);
+        }
+
+        button:disabled {
+            background-color: var(--polar-night-4);
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        #status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .status-success {
+            background-color: #e6f4ea;
+            color: #2d6a4f;
+            border-left: 4px solid #2d6a4f;
+        }
+
+        .status-error {
+            background-color: #fce8e6;
+            color: #c5221f;
+            border-left: 4px solid #c5221f;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--snow-storm-1);
+        }
+
+        .history-table th {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--polar-night-3);
+        }
+
+        .history-table td {
+            font-size: 14px;
+            color: var(--polar-night-2);
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background-color: var(--aurora-4);
+            color: white;
+        }
+
+        .status-badge.error {
+            background-color: var(--aurora-1);
+            color: white;
+        }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Configuration Sync</h1>
-        <p>Sync your dynamic banner and product carousel configurations from your central management system.</p>
-        <button id="sync-button">Sync Config</button>
-        <div id="status-message"></div>
+    <header class="header">
+        <h1>Couture App Dashboard</h1>
+    </header>
+
+    <div class="main-container">
+        <div class="tabs">
+            <button class="tab-link active">Catalogue Sync</button>
+            <!-- Add more tab-link buttons here for future features -->
+        </div>
+
+        <div class="tab-content" id="catalogue-sync">
+            <div class="card">
+                <h2>Sync Control</h2>
+                <p>Manually sync your product carousel configurations from your central management system to Shopify.
+                </p>
+                <button id="sync-button">
+                    <span id="sync-button-text">Sync Configurations</span>
+                    <span id="sync-spinner" style="display: none;">Syncing...</span>
+                </button>
+                <div id="status-message"></div>
+            </div>
+
+            <div class="card">
+                <h2>Sync History</h2>
+                <div id="history-container">
+                    <p id="history-loading">Loading history...</p>
+                    <table class="history-table" id="history-table" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Status</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <!-- Add more tab-content divs here for future features -->
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const syncButton = document.getElementById('sync-button');
             const statusMessage = document.getElementById('status-message');
-            
-            // Get the shop domain from the URL query parameters
             const shopDomain = new URL(location.href).searchParams.get('shop');
+            const historyTableBody = document.getElementById('history-table-body');
+            const historyTable = document.getElementById('history-table');
+            const historyLoading = document.getElementById('history-loading');
 
+            // --- Function to render history table ---
+            function renderHistory(history) {
+                historyTableBody.innerHTML = ''; // Clear existing rows
+                if (!history || history.length === 0) {
+                    historyLoading.textContent = 'No sync history found. Run your first sync!';
+                    historyTable.style.display = 'none';
+                    return;
+                }
+                history.forEach(entry => {
+                    const row = document.createElement('tr');
+                    const statusClass = entry.status === 'success' ? 'success' : 'error';
+                    row.innerHTML = `
+                        <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                        <td><span class="status-badge ${statusClass}">${entry.status}</span></td>
+                        <td>${entry.message}</td>
+                    `;
+                    historyTableBody.appendChild(row);
+                });
+                historyLoading.style.display = 'none';
+                historyTable.style.display = 'table';
+            }
+
+            // --- Function to fetch sync history on page load ---
+            async function fetchHistory() {
+                try {
+                    const response = await fetch(`/get-sync-history?shop=${shopDomain}`);
+                    if (!response.ok) throw new Error('Could not fetch history.');
+                    const data = await response.json();
+                    renderHistory(data.history);
+                } catch (error) {
+                    historyLoading.textContent = `Error: ${error.message}`;
+                }
+            }
+
+            // --- Sync button click event ---
             syncButton.addEventListener('click', async function () {
-                syncButton.textContent = 'Syncing...';
                 syncButton.disabled = true;
                 statusMessage.style.display = 'none';
+                document.getElementById('sync-button-text').style.display = 'none';
+                document.getElementById('sync-spinner').style.display = 'inline';
 
                 try {
                     const response = await fetch('/sync-reco-config', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ shop: shopDomain })
                     });
-
                     const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.error || 'An unknown error occurred.');
-                    }
+                    if (!response.ok) throw new Error(result.error || 'An unknown error occurred.');
 
                     statusMessage.textContent = result.message || 'Sync completed successfully!';
                     statusMessage.className = 'status-success';
-                
+                    await fetchHistory(); // Refresh history after a successful sync
+
                 } catch (error) {
                     statusMessage.textContent = `Error: ${error.message}`;
                     statusMessage.className = 'status-error';
                 } finally {
                     statusMessage.style.display = 'block';
-                    syncButton.textContent = 'Sync Config';
                     syncButton.disabled = false;
+                    document.getElementById('sync-button-text').style.display = 'inline';
+                    document.getElementById('sync-spinner').style.display = 'none';
                 }
             });
+
+            // --- Initial Load ---
+            fetchHistory();
         });
     </script>
 </body>
+
 </html>

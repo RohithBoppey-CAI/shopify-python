@@ -4,7 +4,7 @@ from models.shopify_client import ShopifyAPIClient
 from core.config import settings
 
 
-def sync_reco_configurations(shop: str) -> dict:
+def sync_reco_configurations(shop: str, client: ShopifyAPIClient) -> dict:
     """
     Fetches configurations, builds full public URLs, and upserts them as metaobjects.
     """
@@ -14,7 +14,6 @@ def sync_reco_configurations(shop: str) -> dict:
     if not access_token:
         raise Exception(f"Could not find access token for shop {shop}")
 
-    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
     definition_id = client.ensure_metaobject_definition()
 
     # Call your internal API to get the reco configurations with relative paths

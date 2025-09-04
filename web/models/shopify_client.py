@@ -1,5 +1,7 @@
 import requests
-import time
+import json
+import datetime
+from datetime import timezone
 
 
 class ShopifyAPIClient:
@@ -54,6 +56,81 @@ class ShopifyAPIClient:
         if not op:
             return False
         return op.get("status") not in ("COMPLETED", "FAILED", "CANCELED")
+
+    def get_shop_gid(self):
+        """Helper to get the GraphQL ID of the shop."""
+        query = """
+        query {
+            shop {
+                id
+            }
+        }
+        """
+        response = self._execute_query(query)
+        return response["data"]["shop"]["id"]
+
+    def get_metafield(self, namespace: str, key: str):
+        """Gets a specific metafield from the shop."""
+        query = """
+        query($namespace: String!, $key: String!) {
+            shop {
+                metafield(namespace: $namespace, key: $key) {
+                    id
+                    value
+                }
+            }
+        }
+        """
+        variables = {"namespace": namespace, "key": key}
+        response = self._execute_query(query, variables)
+        return response["data"]["shop"]["metafield"]
+
+    def update_sync_history(self, status: str, message: str):
+        """Gets, updates, and sets the sync history metafield."""
+        # 1. Get existing history
+        existing_history_metafield = self.get_metafield(
+            namespace="couture_app", key="sync_history"
+        )
+        history = []
+        if existing_history_metafield and existing_history_metafield.get("value"):
+            history = json.loads(existing_history_metafield["value"])
+
+        # 2. Create and prepend new log entry
+        new_log = {
+            "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+            "status": status,
+            "message": message,
+        }
+        history.insert(0, new_log)
+
+        # 3. Limit to the last 10 entries
+        limited_history = history[:10]
+
+        # 4. Prepare the metafieldsSet mutation
+        shop_gid = self.get_shop_gid()
+        metafield_input = {
+            "ownerId": shop_gid,
+            "namespace": "couture_app",
+            "key": "sync_history",
+            "type": "json_string",
+            "value": json.dumps(limited_history),
+        }
+
+        mutation = """
+        mutation($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+                metafields {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        variables = {"metafields": [metafield_input]}
+        self._execute_query(mutation, variables)
 
     def fetch_all_products(self, wait: bool = False) -> dict:
         """
