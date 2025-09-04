@@ -18,8 +18,11 @@ def sync_reco_configurations(shop: str) -> dict:
     definition_id = client.ensure_metaobject_definition()
 
     # Call your internal API to get the reco configurations with relative paths
-    external_api_url = "http://localhost:8001/api/reco-config"
-    response = requests.post(external_api_url)
+    external_api_url = f"{settings.PROXY_SERVER_URL}/reco-config"
+
+    headers = {"X-Api-Key": "API_KEY", "X-Store-Identifier": shop}
+
+    response = requests.post(external_api_url, headers=headers)
     response.raise_for_status()
     reco_data = response.json()
 

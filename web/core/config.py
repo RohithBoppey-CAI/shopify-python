@@ -21,5 +21,8 @@ class Settings(BaseSettings):
     # Database URL for storing tokens and sync status
     DATABASE_URL: str = "sqlite:///./shopify_app.db"
 
+    # Proxy URL for hitting requests like: similarity endpoint, product handles, etc
+    PROXY_SERVER_URL: str = "http://localhost:8003/shopify"
+    
 
 settings = Settings()

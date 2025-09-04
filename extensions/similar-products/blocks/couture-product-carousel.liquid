@@ -67,16 +67,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     const debugMode = container.dataset.debugMode === 'true';
     
     const handle = container.dataset.carouselHandle;
-    console.log(handle)
-
     const allCarousels = {{ shop.metaobjects['couture_product_carousel'].values | json }};
-    console.log(allCarousels)
-
-    const chosen = allCarousels.find(item => toKebabCase(item.name) === handle);
-    console.log(chosen)
-
-    const apiUrl = chosen ? chosen.endpoint : null;
-    console.log(apiUrl)
+    
+    const chosen = allCarousels.find(item => toKebabCase(item.name) === toKebabCase(handle) && item.enabled_default == true);
+    let apiUrl = chosen ? chosen.endpoint : null;
+    console.log(allCarousels, apiUrl)
 
     // --- Helper Functions from app_embed.liquid (unchanged) ---
      const sectionSettings = {
@@ -181,9 +176,23 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         // 1. Fetch product handles from the dynamic API endpoint
-        const handleResponse = await fetch(apiUrl, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        const apiKey = 'df2dc6b8360a3bf8ecca291e2c72ffdb';
+        const storeIdentifier = '{{ shop.permanent_domain }}';
+        const currentProductId = {{ product.id | json }};
+
+        if (currentProductId) {
+            apiUrl += `?product_id=${currentProductId}`
+        }
+
+        const handleResponse = await fetch(apiUrl, {
+            headers: {
+                'ngrok-skip-browser-warning': 'true',
+                'X-Api-Key': apiKey,
+                'X-Store-Identifier': storeIdentifier
+            }
+        });
+
         if (!handleResponse.ok) throw new Error(`API request failed with status: ${handleResponse.status}`);
-        
         const handleData = await handleResponse.json();
         const productHandles = handleData.product_handles;
         if (!productHandles || productHandles.length === 0) {
