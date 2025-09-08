@@ -1,5 +1,6 @@
 # This file defines your new Theme App Extension.
 name = "Similar Products Carousel"
+uid = "1730835e-c4f2-a9f5-da18-ba79270993f155e49f3f"
 type = "theme_app_extension"
 
 [capabilities]

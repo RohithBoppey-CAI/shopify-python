@@ -13,6 +13,7 @@ from services.shopify_auth_service import (
 )
 from services.shopify_product_service import (
     trigger_initial_product_sync,
+    trigger_order_history_sync,
     get_last_sync_status,
 )
 from services.shopify_config_service import sync_reco_configurations
@@ -80,7 +81,8 @@ async def auth_callback(request: Request):
 
     if access_token:
         save_or_update_token_in_db(shop=shop, access_token=access_token)
-        trigger_initial_product_sync(shop=shop)
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+        trigger_initial_product_sync(client=client)
 
     final_admin_url = f"{settings.APP_URL}/admin?{request.url.query}"
     return RedirectResponse(url=final_admin_url)
@@ -228,9 +230,7 @@ async def trigger_product_sync(request: Request, background_tasks: BackgroundTas
             message="Full catalogue sync initiated by user.",
         )
 
-        # background_tasks.add_task(run_bulk_product_sync, shop, client)
-
-        trigger_initial_product_sync(shop)
+        trigger_initial_product_sync(client=client)
 
         return {"message": "Product catalogue sync completed successfully."}
 
@@ -269,8 +269,129 @@ async def get_catalogue_sync_history(shop: str):
         return {"error": f"Failed to get history: {str(e)}"}, 500
 
 
+# orders sync
+@app.post("/api/orders/sync")
+async def trigger_order_sync(request: Request):
+    """API endpoint to manually trigger a full order history sync."""
+    data = await request.json()
+    shop = data.get("shop")
+    if not shop:
+        return {"error": "Shop domain is required."}, 400
+
+    access_token = get_shop_access_token(shop)
+    if not access_token:
+        raise Exception("Could not find access token.")
+
+    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+    # Check if a bulk operation is already running to prevent conflicts
+    if client.is_bulk_operation_running():
+        return {"error": "A sync operation is already in progress."}, 409
+
+    # Log the "processing" state immediately
+    client.update_sync_history(
+        key="order_sync_history",
+        status="processing",
+        message="Full order history sync initiated by user.",
+    )
+
+    # Trigger the actual bulk operation
+    trigger_order_history_sync(client=client)
+
+    return {"message": "Order history sync has been started in the background."}
+
+
+@app.get("/get-order-sync-history")
+async def get_order_sync_history(shop: str):
+    """Fetches the order sync history from a shop metafield."""
+    try:
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+        history_metafield = client.get_metafield(
+            namespace="couture_app", key="order_sync_history"
+        )
+        if not history_metafield or not history_metafield.get("value"):
+            return {"history": []}
+        history = json.loads(history_metafield["value"])
+        return {"history": history}
+    except Exception as e:
+        return {"error": f"Failed to get order history: {str(e)}"}, 500
+
+
+@app.post("/api/clear-history")
+async def clear_all_history(request: Request):
+    """Deletes all sync history metafields for a given shop."""
+    data = await request.json()
+    shop = data.get("shop")
+    if not shop:
+        return {"error": "Shop domain is required."}, 400
+
+    try:
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+        # List of all metafield keys used for history logs
+        history_keys_to_delete = [
+            "catalogue_sync_history",
+            "order_sync_history",
+            "reco_config_sync",
+        ]
+
+        deleted_count = 0
+        errors = []
+
+        # Find and delete each metafield
+        for key in history_keys_to_delete:
+            metafield_to_delete = client.get_metafield(namespace="couture_app", key=key)
+            if metafield_to_delete and metafield_to_delete.get("id"):
+                try:
+                    client.delete_metafield(metafield=metafield_to_delete)
+                    deleted_count += 1
+                except Exception as e:
+                    errors.append(f"Could not delete '{key}': {e}")
+
+        if errors:
+            raise Exception(". ".join(errors))
+
+        return {"message": f"Successfully cleared {deleted_count} history logs."}
+
+    except Exception as e:
+        return {"error": f"Failed to clear history: {str(e)}"}, 500
+
+
 @app.get("/api/sync/status")
 async def get_sync_status(shop: str):
     """API endpoint to check the status of the latest bulk operation."""
-    status = get_last_sync_status(shop=shop)
-    return status
+    try:
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+        status = get_last_sync_status(client = client)
+        return status
+
+    except Exception as e:
+        return {"error": e}
+
+
+@app.get("/shopify/access_scopes")
+async def get_access_scopes(shop: str): 
+    try:
+        access_token = get_shop_access_token(shop)
+        if not access_token:
+            raise Exception("Could not find access token.")
+
+        client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+        
+        return client.get_access_scopes()
+    except Exception as e: 
+        return {"error":e}

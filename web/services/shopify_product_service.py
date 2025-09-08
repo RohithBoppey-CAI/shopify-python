@@ -17,41 +17,87 @@ def get_access_token_for_shop(shop: str) -> str:
         raise Exception(f"Access token for shop {shop} not found.")
 
 
-def trigger_initial_product_sync(shop: str) -> dict:
+def trigger_initial_product_sync(client: ShopifyAPIClient) -> dict:
     """
     Starts a background bulk operation to fetch all products for a given store.
     """
-    access_token = get_access_token_for_shop(shop)
-    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
-
     if client.is_bulk_operation_running():
         return {"status": "A sync operation is already in progress."}
 
-    print(f"Triggering background catalogue download for the shop {shop}")
-    result = client.fetch_all_products(wait=False)
+    print("Triggering background catalogue!")
+    result = client.fetch_all_products()
 
     return result
 
 
-def get_last_sync_status(shop: str) -> dict:
+def trigger_order_history_sync(client: ShopifyAPIClient) -> dict:
+    """
+    Starts a background bulk operation to fetch all products for a given store.
+    """
+
+    if client.is_bulk_operation_running():
+        return {"status": "A sync operation is already in progress."}
+
+    print("Triggering order history download!")
+    result = client.fetch_all_orders_information()
+    print(result)
+    return result
+
+
+def get_last_sync_status(client: ShopifyAPIClient) -> dict:
     """
     Checks the status of the most recent bulk operation for a store.
     """
-    access_token = get_access_token_for_shop(shop)
-    client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
-    status = client.get_bulk_operation_status()
+    status_data = client.get_bulk_operation_status()
 
-    # If the operation is complete, download and save the data
-    if status.get("status") == "COMPLETED" and status.get("url"):
-        products = read_jsonl_from_url(status["url"])
-        save_to_json(filename=f"{shop}_products.jsonl", data_dict=products)
-        # TODO: Update the status in your database to "Completed".
+    if not status_data or not status_data.get("status"):
+        return {"message": "No active sync operation found."}
 
-    client.update_sync_history(
-        key="catalogue_sync_history",
-        status="success",
-        message="Sync complete",
-        update_latest_processing=True,
-    )
+    final_status = status_data.get("status")
 
-    return status
+    # Determine which sync type this was based on the GraphQL query
+    query = status_data.get("query", "")
+
+    history_key = None
+    filename_key = None
+
+    if "products" in query:
+        history_key = "catalogue_sync_history"
+        filename_key = "products"
+    elif "orders" in query:
+        history_key = "order_sync_history"
+        filename_key = "orders"
+
+    if not history_key:
+        print("No history key found")
+        return status_data  # Not a sync we are tracking
+
+    if final_status == "COMPLETED":
+        try:
+            products = read_jsonl_from_url(status_data["url"])
+            save_to_json(
+                filename=f"{client.shop_url}_{filename_key}.jsonl", data_dict=products
+            )
+        except Exception as e:
+            print(f"Cannot save information for {filename_key}: {e}")
+
+        message = (
+            f"Sync complete. {status_data.get('objectCount', 'All')} items indexed."
+        )
+
+        client.update_sync_history(
+            key=history_key,
+            status="success",
+            message=message,
+            update_latest_processing=True,
+        )
+    elif final_status in ["FAILED", "CANCELED", "EXPIRED"]:
+        message = f"Sync {final_status.lower()}. Reason: {status_data.get('errorCode', 'Unknown')}"
+        client.update_sync_history(
+            key=history_key,
+            status="error",
+            message=message,
+            update_latest_processing=True,
+        )
+
+    return status_data

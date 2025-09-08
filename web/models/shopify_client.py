@@ -10,6 +10,7 @@ class ShopifyAPIClient:
     """
 
     def __init__(self, shop_url: str, access_token: str):
+        self.shop_url = shop_url
         self.api_version = "2025-04"
         self.graphql_endpoint = (
             f"https://{shop_url}/admin/api/{self.api_version}/graphql.json"
@@ -37,6 +38,7 @@ class ShopifyAPIClient:
         query {
           currentBulkOperation {
             id
+            query
             status
             errorCode
             createdAt
@@ -73,13 +75,21 @@ class ShopifyAPIClient:
         """Gets a specific metafield from the shop."""
         query = """
         query($namespace: String!, $key: String!) {
-            shop {
-                metafield(namespace: $namespace, key: $key) {
-                    id
-                    value
+        shop {
+            metafield(namespace: $namespace, key: $key) {
+                id
+                namespace
+                key
+                value
+                owner {
+                    __typename
+                    ... on Shop { id }
+                    ... on Product { id }
+                    ... on Customer { id }
                 }
             }
         }
+    }
         """
         variables = {"namespace": namespace, "key": key}
         response = self._execute_query(query, variables)
@@ -157,7 +167,7 @@ class ShopifyAPIClient:
         variables = {"metafields": [metafield_input]}
         self._execute_query(mutation, variables)
 
-    def fetch_all_products(self, wait: bool = False) -> dict:
+    def fetch_all_products(self) -> dict:
         """
         Initiates a bulk query to fetch all products and their variants.
         """
@@ -214,7 +224,75 @@ class ShopifyAPIClient:
         }
         """
         response = self._execute_query(bulk_query)
-        print(response)
+        # print(response)
+        return response.get("data", {}).get("bulkOperationRunQuery", {})
+
+    def fetch_all_orders_information(self) -> dict:
+        """
+        Fetch all the orders information
+        """
+        bulk_query = """
+        mutation {
+          bulkOperationRunQuery(
+            query: \"""
+            {
+              orders {
+                edges {
+                  node {
+                    id
+                    name
+                    createdAt
+                    currencyCode
+                    totalPriceSet {
+                      shopMoney {
+                        amount
+                        currencyCode
+                      }
+                    }
+                    lineItems(first: 250) {
+                      edges {
+                        node {
+                          id
+                          title
+                          quantity
+                          discountedTotalSet {
+                            shopMoney {
+                              amount
+                              currencyCode
+                            }
+                          }
+                          product {
+                            id
+                            title
+                          }
+                          variant {
+                            id
+                            title
+                            sku
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            \"""
+          ) {
+            bulkOperation {
+              id
+              status
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+"""
+        print("Order sync started")
+        response = self._execute_query(bulk_query)
+        # print(response)
         return response.get("data", {}).get("bulkOperationRunQuery", {})
 
     # --- METAOBJECT METHODS ---
@@ -335,7 +413,7 @@ class ShopifyAPIClient:
 
         response = self._execute_query(mutation, variables)
 
-        print(response)
+        # print(response)
 
         # Check if the API call itself had top-level errors
         if "errors" in response:
@@ -350,3 +428,66 @@ class ShopifyAPIClient:
             errors = upsert_data.get("userErrors", [])
             print(f"[ERROR] Failed to upsert metaobject '{handle}': {errors}")
             return "failed"
+
+    def delete_metafield(self, metafield: dict):
+        """
+        Deletes a metafield using metafieldsDelete (requires ownerId, namespace, key).
+        """
+        mutation = """
+        mutation MetafieldsDelete($metafields: [MetafieldIdentifierInput!]!) {
+        metafieldsDelete(metafields: $metafields) {
+            deletedMetafields {
+            key
+            namespace
+            ownerId
+            }
+            userErrors {
+            field
+            message
+            }
+        }
+        }
+        """
+
+        variables = {
+            "metafields": [
+                {
+                    "ownerId": metafield["owner"]["id"],
+                    "namespace": metafield["namespace"],
+                    "key": metafield["key"],
+                }
+            ]
+        }
+
+        response = self._execute_query(mutation, variables)
+        print("Shopify API response:", response)
+
+        errors = (
+            response.get("data", {}).get("metafieldsDelete", {}).get("userErrors", [])
+        )
+        if errors:
+            raise Exception(f"Failed to delete metafield {metafield['key']}: {errors}")
+
+        return response
+
+    def get_access_scopes(self) -> list:
+        """
+        Makes a GraphQL query to Shopify to get the list of scopes
+        associated with the access token being used.
+        """
+        query = """
+        query {
+            appInstallation {
+                accessScopes {
+                    handle
+                }
+            }
+        }
+        """
+        response = self._execute_query(query)
+        scopes = (
+            response.get("data", {}).get("appInstallation", {}).get("accessScopes", [])
+        )
+
+        # Extract just the string handles from the response
+        return [scope["handle"] for scope in scopes]

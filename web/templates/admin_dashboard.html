@@ -4,44 +4,48 @@
 <head>
     <meta charset="UTF-8">
     <title>Couture App Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --polar-bg: #f4f6f8;
-            --white-bg: #ffffff;
-            --border-color: #dfe3e8;
-            --text-primary: #212b36;
-            --text-secondary: #637381;
-            --primary-action: #007bff;
-            --primary-action-hover: #0056b3;
-            --status-success-bg: #e6f4ea;
-            --status-success-text: #2d6a4f;
-            --status-error-bg: #fce8e6;
-            --status-error-text: #c5221f;
-            --status-processing-bg: #fff5e6;
-            --status-processing-text: #997400;
+            --primary-color: #4A90E2;
+            --success-color: #2D6A4F;
+            --success-bg: #E6F4EA;
+            --error-color: #C5221F;
+            --error-bg: #FCE8E6;
+            --processing-color: #9A6700;
+            --processing-bg: #FFFBEB;
+            --border-color: #dfe1e5;
+            --text-color: #172b4d;
+            --text-color-light: #5e6c84;
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            background-color: var(--polar-bg);
+            background-color: var(--bg-color);
+            color: var(--text-color);
         }
 
         .header {
-            background-color: var(--white-bg);
+            background-color: var(--card-bg);
             padding: 20px 40px;
             border-bottom: 1px solid var(--border-color);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            box-shadow: var(--shadow);
         }
 
         .header h1 {
             font-size: 24px;
             margin: 0;
-            color: var(--text-primary);
+            color: var(--text-color);
         }
 
-        .main-content {
-            padding: 40px;
+        .main-container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 40px;
         }
 
         .tabs {
@@ -50,65 +54,64 @@
             margin-bottom: 30px;
         }
 
-        .tab-link {
-            font-size: 16px;
-            padding: 15px 25px;
+        .tab-button {
+            padding: 12px 20px;
             cursor: pointer;
+            background: none;
             border: none;
-            background-color: transparent;
-            color: var(--text-secondary);
             border-bottom: 3px solid transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-color-light);
             margin-bottom: -1px;
-            /* Overlaps the main border */
         }
 
-        .tab-link.active {
-            color: var(--primary-action);
-            border-bottom-color: var(--primary-action);
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
         }
 
-        .tab-pane {
+        .tab-content {
             display: none;
         }
 
-        .tab-pane.active {
+        .tab-content.active {
             display: block;
         }
 
         .card {
-            background: var(--white-bg);
-            padding: 30px;
+            background: var(--card-bg);
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--shadow);
+            padding: 25px;
             margin-bottom: 30px;
         }
 
         .card h2 {
             font-size: 20px;
             margin-top: 0;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .card p {
-            color: var(--text-secondary);
-            margin-bottom: 25px;
+            color: var(--text-color-light);
+            margin-top: 0;
         }
 
         button {
-            background-color: var(--primary-action);
+            background-color: var(--primary-color);
             color: white;
             border: none;
             padding: 12px 20px;
             font-size: 16px;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
             transition: background-color 0.2s;
-            display: inline-flex;
-            align-items: center;
+            font-weight: 500;
         }
 
         button:hover {
-            background-color: var(--primary-action-hover);
+            background-color: #357ABD;
         }
 
         button:disabled {
@@ -124,13 +127,21 @@
         }
 
         .status-success {
-            background-color: var(--status-success-bg);
-            color: var(--status-success-text);
+            background-color: var(--success-bg);
+            color: var(--success-color);
+            border: 1px solid var(--success-color);
         }
 
         .status-error {
-            background-color: var(--status-error-bg);
-            color: var(--status-error-text);
+            background-color: var(--error-bg);
+            color: var(--error-color);
+            border: 1px solid var(--error-color);
+        }
+
+        .status-processing {
+            background-color: var(--processing-bg);
+            color: var(--processing-color);
+            border: 1px solid var(--processing-color);
         }
 
         table {
@@ -148,37 +159,44 @@
 
         th {
             font-weight: 600;
-            color: var(--text-primary);
+            font-size: 14px;
+            color: var(--text-color-light);
         }
 
         td {
-            color: var(--text-secondary);
+            font-size: 14px;
         }
 
         .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
+            padding: 4px 8px;
             border-radius: 12px;
             font-weight: 500;
+            font-size: 12px;
             text-transform: capitalize;
         }
 
         .status-badge.success {
-            background-color: var(--status-success-bg);
-            color: var(--status-success-text);
+            background: var(--success-bg);
+            color: var(--success-color);
         }
 
         .status-badge.error {
-            background-color: var(--status-error-bg);
-            color: var(--status-error-text);
+            background: var(--error-bg);
+            color: var(--error-color);
         }
 
         .status-badge.processing {
-            background-color: var(--status-processing-bg);
-            color: var(--status-processing-text);
+            background: var(--processing-bg);
+            color: var(--processing-color);
         }
 
-        /* New */
+        .danger-button {
+            background-color: #D92D20;
+        }
+
+        .danger-button:hover {
+            background-color: #B42318;
+        }
     </style>
 </head>
 
@@ -188,25 +206,25 @@
         <h1>Couture App Dashboard</h1>
     </div>
 
-    <div class="main-content">
+    <div class="main-container">
         <div class="tabs">
-            <button class="tab-link active" data-tab="catalogue-sync">Catalogue Sync</button>
-            <button class="tab-link" data-tab="reco-banners">Reco Banners Sync</button>
+            <button class="tab-button active" onclick="openTab(event, 'catalogue-sync')">Catalogue Sync</button>
+            <button class="tab-button" onclick="openTab(event, 'order-sync')">Order History Sync</button>
+            <button class="tab-button" onclick="openTab(event, 'reco-sync')">Reco Banners Sync</button>
+            <button class="tab-button" onclick="openTab(event, 'settings')">Settings</button>
         </div>
 
-        <!-- Tab 1: Catalogue Sync -->
-        <div id="catalogue-sync" class="tab-pane active">
+        <!-- Catalogue Sync Tab -->
+        <div id="catalogue-sync" class="tab-content active">
             <div class="card">
-                <h2>Full Product Catalogue Sync</h2>
-                <p>Manually trigger a full sync of your product catalogue. This runs in the background and can take
+                <h2>Product Catalogue Sync</h2>
+                <p>Manually trigger a full sync of your product catalogue. This is a background process and may take
                     several minutes.</p>
-                <button id="sync-catalogue-button">Sync Full Catalogue</button>
+                <button id="sync-catalogue-button">Sync Catalogue</button>
                 <div id="catalogue-status-message" class="status-message"></div>
             </div>
-            <!-- New History Table for Catalogue Sync -->
             <div class="card">
                 <h2>Sync History</h2>
-                <p>Showing the last 10 catalogue sync events.</p>
                 <table id="catalogue-history-table">
                     <thead>
                         <tr>
@@ -224,17 +242,43 @@
             </div>
         </div>
 
-        <!-- Tab 2: Reco Banners Sync -->
-        <div id="reco-banners" class="tab-pane">
+        <!-- Order History Sync Tab -->
+        <div id="order-sync" class="tab-content">
             <div class="card">
-                <h2>Recommendation Banner Sync</h2>
+                <h2>Order History Sync</h2>
+                <p>Manually trigger a full sync of your store's order history. This is a background process.</p>
+                <button id="sync-orders-button">Sync Order History</button>
+                <div id="order-status-message" class="status-message"></div>
+            </div>
+            <div class="card">
+                <h2>Sync History</h2>
+                <table id="order-history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="3">Loading history...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Reco Banners Sync Tab -->
+        <div id="reco-sync" class="tab-content">
+            <div class="card">
+                <h2>Recommendation Banners Sync</h2>
                 <p>Sync your dynamic banner and product carousel configurations from your central management system.</p>
                 <button id="sync-reco-button">Sync Reco Banners</button>
                 <div id="reco-status-message" class="status-message"></div>
             </div>
             <div class="card">
                 <h2>Sync History</h2>
-                <p>Showing the last 10 recommendation banner sync events.</p>
                 <table id="reco-history-table">
                     <thead>
                         <tr>
@@ -251,30 +295,78 @@
                 </table>
             </div>
         </div>
+
+        <!-- NEW: Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2>App Settings</h2>
+                <p>Manage application data and settings. These actions are irreversible.</p>
+                <button id="clear-history-button" class="danger-button">Clear All Sync History</button>
+                <div id="settings-status-message" class="status-message"></div>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const shopDomain = new URL(location.href).searchParams.get('shop');
-            let isCatalogueSyncing = false; // State variable to prevent double-clicks
+        const shopDomain = new URL(location.href).searchParams.get('shop');
 
-            // --- Tab Switching Logic ---
-            const tabs = document.querySelectorAll('.tab-link');
-            const panes = document.querySelectorAll('.tab-pane');
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    panes.forEach(p => p.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById(tab.dataset.tab).classList.add('active');
+        function openTab(evt, tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        async function fetchHistory(endpoint, tableId, statusId) {
+            const tableBody = document.querySelector(`#${tableId} tbody`);
+            try {
+                const response = await fetch(`${endpoint}?shop=${shopDomain}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Failed to fetch history');
+
+                tableBody.innerHTML = '';
+                if (data.history.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="3">No sync history found.</td></tr>';
+                    return;
+                }
+
+                data.history.forEach(log => {
+                    const row = tableBody.insertRow();
+                    row.innerHTML = `
+                        <td>${new Date(log.timestamp).toLocaleString()}</td>
+                        <td><span class="status-badge ${log.status}">${log.status}</span></td>
+                        <td>${log.message}</td>
+                    `;
                 });
-            });
 
-            // --- Generic Sync Function (for simple, quick syncs) ---
-            async function performSimpleSync(endpoint, button, statusEl) {
+                const latestStatus = data.history[0]?.status;
+                const statusMessage = document.getElementById(statusId);
+                if (latestStatus === 'processing') {
+                    statusMessage.textContent = 'A sync operation is currently in progress...';
+                    statusMessage.className = 'status-message status-processing';
+                    statusMessage.style.display = 'block';
+                }
+
+            } catch (error) {
+                tableBody.innerHTML = `<tr><td colspan="3" style="color:red;">Error loading history: ${error.message}</td></tr>`;
+            }
+        }
+
+        async function handleSyncClick(buttonId, endpoint, statusId, historyEndpoint, historyTableId) {
+            const button = document.getElementById(buttonId);
+            const statusMessage = document.getElementById(statusId);
+
+            button.addEventListener('click', async () => {
+                const isSyncing = document.querySelector(`#${historyTableId} .status-badge.processing`);
+                if (isSyncing) {
+                    alert('A sync operation is already in progress. Please wait for it to complete.');
+                    return;
+                }
+
                 button.textContent = 'Syncing...';
                 button.disabled = true;
-                statusEl.style.display = 'none';
+                statusMessage.style.display = 'none';
+
                 try {
                     const response = await fetch(endpoint, {
                         method: 'POST',
@@ -283,93 +375,73 @@
                     });
                     const result = await response.json();
                     if (!response.ok) throw new Error(result.error || 'An unknown error occurred.');
-                    statusEl.textContent = result.message || 'Sync completed successfully!';
-                    statusEl.className = 'status-message status-success';
+
+                    statusMessage.textContent = result.message;
+                    statusMessage.className = 'status-message status-success';
                 } catch (error) {
-                    statusEl.textContent = `Error: ${error.message}`;
-                    statusEl.className = 'status-message status-error';
+                    statusMessage.textContent = `Error: ${error.message}`;
+                    statusMessage.className = 'status-message status-error';
                 } finally {
-                    statusEl.style.display = 'block';
+                    statusMessage.style.display = 'block';
                     button.textContent = button.dataset.defaultText;
                     button.disabled = false;
+                    fetchHistory(historyEndpoint, historyTableId, statusId);
                 }
-            }
+            });
+        }
 
-            // --- Generic History Fetch Function ---
-            async function fetchHistory(endpoint, tableBody) {
-                try {
-                    const response = await fetch(`${endpoint}?shop=${shopDomain}`);
-                    const data = await response.json();
-                    if (!response.ok) throw new Error(data.error);
-
-                    tableBody.innerHTML = ''; // Clear existing rows
-                    if (data.history && data.history.length > 0) {
-                        isCatalogueSyncing = data.history[0].status === 'processing'; // Check if the latest sync is still processing
-                        data.history.forEach(log => {
-                            const row = tableBody.insertRow();
-                            const date = new Date(log.timestamp).toLocaleString();
-                            row.innerHTML = `
-                                <td>${date}</td>
-                                <td><span class="status-badge ${log.status}">${log.status}</span></td>
-                                <td>${log.message}</td>
-                            `;
-                        });
-                    } else {
-                        isCatalogueSyncing = false;
-                        tableBody.innerHTML = '<tr><td colspan="3">No sync history found.</td></tr>';
-                    }
-                } catch (error) {
-                    isCatalogueSyncing = false;
-                    tableBody.innerHTML = `<tr><td colspan="3">Error loading history: ${error.message}</td></tr>`;
-                }
-            }
-
-            // --- Reco Banners Tab Logic ---
-            const syncRecoButton = document.getElementById('sync-reco-button');
-            const recoStatusMessage = document.getElementById('reco-status-message');
-            syncRecoButton.dataset.defaultText = 'Sync Reco Banners';
-
-            syncRecoButton.addEventListener('click', async () => {
-                await performSimpleSync('/sync-reco-config', syncRecoButton, recoStatusMessage);
-                fetchRecoSyncHistory(); // Refresh history after sync
+        document.addEventListener('DOMContentLoaded', () => {
+            // Store default button text
+            document.querySelectorAll('button[id^="sync-"]').forEach(btn => {
+                btn.dataset.defaultText = btn.textContent;
             });
 
-            const recoHistoryTableBody = document.querySelector('#reco-history-table tbody');
-            const fetchRecoSyncHistory = () => fetchHistory('/get-sync-history', recoHistoryTableBody);
+            // Fetch initial histories
+            fetchHistory('/get-catalogue-sync-history', 'catalogue-history-table', 'catalogue-status-message');
+            fetchHistory('/get-order-sync-history', 'order-history-table', 'order-status-message');
+            fetchHistory('/get-sync-history', 'reco-history-table', 'reco-status-message');
 
-            // --- Catalogue Sync Tab Logic ---
-            const syncCatalogueButton = document.getElementById('sync-catalogue-button');
-            const catalogueStatusMessage = document.getElementById('catalogue-status-message');
-            syncCatalogueButton.dataset.defaultText = 'Sync Full Catalogue';
+            // Wire up sync buttons
+            handleSyncClick('sync-catalogue-button', '/api/products/sync', 'catalogue-status-message', '/get-catalogue-sync-history', 'catalogue-history-table');
+            handleSyncClick('sync-orders-button', '/api/orders/sync', 'order-status-message', '/get-order-sync-history', 'order-history-table');
+            handleSyncClick('sync-reco-button', '/sync-reco-config', 'reco-status-message', '/get-sync-history', 'reco-history-table');
 
-            const catalogueHistoryTableBody = document.querySelector('#catalogue-history-table tbody');
-            const fetchCatalogueSyncHistory = () => fetchHistory('/get-catalogue-sync-history', catalogueHistoryTableBody);
-
-            syncCatalogueButton.addEventListener('click', async () => {
-                if (isCatalogueSyncing) {
-                    alert('A catalogue sync is already in progress. Please wait for it to complete.');
+            // NEW: Wire up clear history button
+            const clearButton = document.getElementById('clear-history-button');
+            const settingsStatus = document.getElementById('settings-status-message');
+            clearButton.addEventListener('click', async () => {
+                if (!confirm('Are you sure you want to delete ALL sync history? This action cannot be undone.')) {
                     return;
                 }
+                clearButton.textContent = 'Clearing...';
+                clearButton.disabled = true;
+                settingsStatus.style.display = 'none';
 
-                isCatalogueSyncing = true;
-                // Instantly show "Processing" in the UI
-                const newRow = catalogueHistoryTableBody.insertRow(0);
-                newRow.innerHTML = `
-                    <td>${new Date().toLocaleString()}</td>
-                    <td><span class="status-badge processing">processing</span></td>
-                    <td>Sync initiated by user...</td>
-                `;
+                try {
+                    const response = await fetch('/api/clear-history', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ shop: shopDomain })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Failed to clear history.');
 
-                await performSimpleSync('/api/products/sync', syncCatalogueButton, catalogueStatusMessage);
+                    settingsStatus.textContent = result.message;
+                    settingsStatus.className = 'status-message status-success';
+                    // Refresh all history tables
+                    fetchHistory('/get-catalogue-sync-history', 'catalogue-history-table', 'catalogue-status-message');
+                    fetchHistory('/get-order-sync-history', 'order-history-table', 'order-status-message');
+                    fetchHistory('/get-sync-history', 'reco-history-table', 'reco-status-message');
 
-                // Refresh the history to get the final status from the backend
-                await fetchCatalogueSyncHistory();
-                isCatalogueSyncing = false;
+                } catch (error) {
+                    settingsStatus.textContent = `Error: ${error.message}`;
+                    settingsStatus.className = 'status-message status-error';
+                } finally {
+                    settingsStatus.style.display = 'block';
+                    clearButton.textContent = 'Clear All Sync History';
+                    clearButton.disabled = false;
+                }
             });
-
-            // --- Initial Load ---
-            fetchRecoSyncHistory();
-            fetchCatalogueSyncHistory();
         });
     </script>
 </body>

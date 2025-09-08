@@ -54,7 +54,9 @@ def get_shop_access_token(shop: str) -> str | None:
     db = SessionLocal()
     try:
         store = db.query(Store).filter(Store.shop_url == shop).first()
-        return store.access_token if store else None
+        store_access_token = store.access_token if store else None
+        # print(store_access_token)
+        return store_access_token
     finally:
         db.close()
 
