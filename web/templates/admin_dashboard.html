@@ -397,14 +397,14 @@
             });
 
             // Fetch initial histories
-            fetchHistory('/get-catalogue-sync-history', 'catalogue-history-table', 'catalogue-status-message');
-            fetchHistory('/get-order-sync-history', 'order-history-table', 'order-status-message');
-            fetchHistory('/get-sync-history', 'reco-history-table', 'reco-status-message');
+            fetchHistory('/sync/history/products', 'catalogue-history-table', 'catalogue-status-message');
+            fetchHistory('/sync/history/orders', 'order-history-table', 'order-status-message');
+            fetchHistory('/sync/history/reco', 'reco-history-table', 'reco-status-message');
 
             // Wire up sync buttons
-            handleSyncClick('sync-catalogue-button', '/api/products/sync', 'catalogue-status-message', '/get-catalogue-sync-history', 'catalogue-history-table');
-            handleSyncClick('sync-orders-button', '/api/orders/sync', 'order-status-message', '/get-order-sync-history', 'order-history-table');
-            handleSyncClick('sync-reco-button', '/sync-reco-config', 'reco-status-message', '/get-sync-history', 'reco-history-table');
+            handleSyncClick('sync-catalogue-button', '/sync/products', 'catalogue-status-message', '/sync/history/products', 'catalogue-history-table');
+            handleSyncClick('sync-orders-button', '/sync/orders', 'order-status-message', '/sync/history/orders', 'order-history-table');
+            handleSyncClick('sync-reco-button', '/sync/reco-config', 'reco-status-message', '/sync/history/reco', 'reco-history-table');
 
             // NEW: Wire up clear history button
             const clearButton = document.getElementById('clear-history-button');
@@ -418,7 +418,7 @@
                 settingsStatus.style.display = 'none';
 
                 try {
-                    const response = await fetch('/api/clear-history', {
+                    const response = await fetch('/sync/history/clear', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ shop: shopDomain })
