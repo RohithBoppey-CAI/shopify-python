@@ -1,20 +1,6 @@
-# services/shopify_product_service.py
-import time
 from models.shopify_client import ShopifyAPIClient
 from utils.commons.api_utils import read_jsonl_from_url
 from utils.commons.file_utils import save_to_json
-
-
-def get_access_token_for_shop(shop: str) -> str:
-    """
-    Retrieves the access token for a given shop.
-    In a real application, this would fetch from a secure database.
-    """
-    try:
-        with open(f"{shop}_token.txt", "r") as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        raise Exception(f"Access token for shop {shop} not found.")
 
 
 def trigger_initial_product_sync(client: ShopifyAPIClient) -> dict:
