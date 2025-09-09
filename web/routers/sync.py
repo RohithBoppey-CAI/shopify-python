@@ -65,6 +65,7 @@ async def trigger_order_sync(
 
 @router.get("/history/products")
 async def get_catalogue_sync_history(
+    shop: str,
     client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
 ):
     """Fetches the catalogue sync history from a shop metafield."""
@@ -84,6 +85,7 @@ async def get_catalogue_sync_history(
 
 @router.get("/history/orders")
 async def get_order_sync_history(
+    shop: str,
     client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
 ):
     """Fetches the order sync history from a shop metafield."""
@@ -103,7 +105,7 @@ async def get_order_sync_history(
 
 @router.post("/reco-config")
 async def sync_reco_config(
-    client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
+    client: ShopifyAPIClient = Depends(get_shopify_client_from_query), body: dict = {}
 ):
     """Sync recommendation configurations."""
     try:
@@ -125,6 +127,7 @@ async def sync_reco_config(
 
 @router.get("/history/reco")
 async def get_reco_sync_history(
+    shop: str,
     client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
 ):
     """Fetches the reco sync history from a shop metafield."""
@@ -144,6 +147,7 @@ async def get_reco_sync_history(
 
 @router.post("/history/clear")
 async def clear_all_history(
+    shop: str,
     client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
 ):
     """Deletes all sync history metafields for a given shop."""
@@ -179,6 +183,7 @@ async def clear_all_history(
 
 @router.get("/status")
 async def get_sync_status(
+    shop: str,
     client: ShopifyAPIClient = Depends(get_shopify_client_from_query),
 ):
     """API endpoint to check the status of the latest bulk operation."""
