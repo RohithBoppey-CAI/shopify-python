@@ -1,156 +1,349 @@
 {% comment %}
-Final Production-Ready Version:
-- Flexbox grid provides a responsive layout compatible with all themes.
-- Debug panel and Schema are fully enabled.
-- Black list-item dots have been removed via CSS.
+  Fixed Production-Ready Version with CSS Context Preloader:
+  - Invisible HTML container to provide CSS context for product cards
+  - Ensures images and theme styles load properly
+  - Maintains clean visible UI while fixing rendering issues
 {% endcomment %}
 
 <div class="couture-search-section page-width" id="couture-container-{{ section.id }}"
 	data-section-id="{{ section.id }}" data-api-base-url="{{ block.settings.api_base_url }}"
 	data-user-selector="{{ block.settings.user_product_selector }}" data-debug-mode="{{ block.settings.debug_mode }}">
+	<!-- Search Form and Controls Toolbar -->
+	<div class="couture-search-header">
+		<form class="couture-search-form" id="couture-search-form-{{ section.id }}">
+			<input type="search" id="couture-search-input-{{ section.id }}" class="couture-search-input"
+				placeholder="Search for products...">
+			<button type="submit" class="couture-search-button" aria-label="Search">
+				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+					stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="11" cy="11" r="8"></circle>
+					<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+				</svg>
+			</button>
+		</form>
+
+		<div class="couture-controls-toolbar">
+			<div class="couture-controls-left">
+				<span>Filter:</span>
+				<select class="couture-filter-dropdown">
+					<option>Availability</option>
+				</select>
+				<select class="couture-filter-dropdown">
+					<option>Price</option>
+				</select>
+			</div>
+			<div class="couture-controls-right">
+				<select class="couture-sort-dropdown">
+					<option>Sort by: Relevance</option>
+				</select>
+				<span class="couture-results-count" id="couture-results-count-{{ section.id }}"></span>
+			</div>
+		</div>
+	</div>
+
 	{% if block.settings.debug_mode %}
 	<div class="couture-debug-panel"
 		style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-family: monospace; font-size: 12px;">
 		<strong>Debug Information:</strong>
 		<p><strong>API Base URL:</strong> {{ block.settings.api_base_url }}</p>
-		<p><strong>User Product Selector:</strong> {{ block.settings.user_product_selector | default: 'Using default' }}
-		</p>
+		<p><strong>User Product Selector:</strong> {{ block.settings.user_product_selector | default: 'Auto-detecting'
+			}}</p>
 		<div id="debug-log-{{ section.id }}"></div>
 	</div>
 	{% endif %}
 
+	<!-- INVISIBLE CSS CONTEXT PRELOADER - This ensures theme CSS is available -->
+	<div id="couture-css-context-{{ section.id }}"
+		style="position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none;">
+		<!-- Full HTML context will be loaded here invisibly -->
+	</div>
+
 	<div class="couture-results-grid" id="couture-results-grid-{{ section.id }}">
-		<p>Searching...</p>
+		<!-- Results will be injected here -->
+		<p>Please enter a search term above to begin.</p>
 	</div>
 </div>
 
 <script>
-	document.addEventListener('DOMContentLoaded', async function () {
-		const container = document.getElementById('couture-container-{{ section.id }}');
-		if (!container) return;
+	document.addEventListener('DOMContentLoaded', function () {
+		const sectionId = '{{ section.id }}';
+		const container = document.getElementById('couture-container-' + sectionId);
+		if (!container) {
+			console.error('[COUTURE] Container not found:', 'couture-container-' + sectionId);
+			return;
+		}
 
-		// --- Configuration ---
-		const sectionId = container.dataset.sectionId;
+		// --- Configuration & Element References ---
 		const apiBaseUrl = container.dataset.apiBaseUrl;
-		const userProductSelector = container.dataset.userSelector || '.product-grid__item';
+		const userProductSelector = container.dataset.userSelector;
 		const debugMode = container.dataset.debugMode === 'true';
+
+		const searchForm = document.getElementById('couture-search-form-' + sectionId);
+		const searchInput = document.getElementById('couture-search-input-' + sectionId);
 		const resultsContainer = document.getElementById('couture-results-grid-' + sectionId);
+		const resultsCountEl = document.getElementById('couture-results-count-' + sectionId);
+		const cssContextContainer = document.getElementById('couture-css-context-' + sectionId);
+
+		// Validate all required elements exist
+		if (!searchForm || !searchInput || !resultsContainer || !cssContextContainer) {
+			console.error('[COUTURE] Required elements not found');
+			return;
+		}
+
+		debugLog('Couture Search initialized', {
+			sectionId,
+			apiBaseUrl,
+			userProductSelector,
+			debugMode
+		});
 
 		// --- Helper Functions ---
 		function debugLog(message, data = null) {
+			console.log(`[COUTURE DEBUG ${sectionId}] ${message}`, data || '');
 			if (!debugMode) return;
+
 			const debugPanel = document.getElementById('debug-log-' + sectionId);
 			if (debugPanel) {
 				const logEntry = document.createElement('div');
-				logEntry.style.marginTop = '5px';
-				logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}${data ? `<pre style="white-space: pre-wrap; word-break: break-all;">${JSON.stringify(data, null, 2)}</pre>` : ''}`;
+				logEntry.style.cssText = 'margin-top: 5px; padding: 5px; background: #fff; border: 1px solid #ddd; font-size: 11px;';
+				logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}${data ? `<pre style="font-size: 10px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto;">${JSON.stringify(data, null, 2)}</pre>` : ''}`;
 				debugPanel.appendChild(logEntry);
 			}
 		}
+
 		function showErrorMessage(errorMessage) {
 			debugLog('FATAL ERROR:', { message: errorMessage });
 			if (resultsContainer) {
-				resultsContainer.innerHTML = `<p style="color: red; padding: 20px;"><strong>Error:</strong> ${errorMessage}</p>`;
+				resultsContainer.innerHTML = `<p style="color: red; padding: 20px; background: #fff5f5; border: 1px solid #ffdddd;"><strong>Error:</strong> ${errorMessage}</p>`;
 			}
 		}
 
-		// --- Core Logic Functions ---
-		async function getCardTemplate() {
-			debugLog('Fetching card template from /collections/all');
+		function showLoadingState() {
+			if (resultsContainer) {
+				resultsContainer.innerHTML = '<p style="padding: 20px; text-align: center;">Searching...</p>';
+			}
+			if (resultsCountEl) {
+				resultsCountEl.textContent = '';
+			}
+		}
+
+		function showEmptyState(searchTerm = '') {
+			if (resultsContainer) {
+				const message = searchTerm ? `No results found for "${searchTerm}".` : 'Please enter a search term above to begin.';
+				resultsContainer.innerHTML = `<p style="padding: 20px; text-align: center;">${message}</p>`;
+			}
+			if (resultsCountEl) {
+				resultsCountEl.textContent = searchTerm ? '0 results' : '';
+			}
+		}
+
+		// HTML Entity Decoder to fix &trade; symbols
+		function decodeHTMLEntities(text) {
+			const textArea = document.createElement('textarea');
+			textArea.innerHTML = text;
+			return textArea.value;
+		}
+
+		// SOLUTION: Load full HTML context invisibly to provide CSS dependencies
+		async function loadCSSContext(productHandles) {
+			debugLog('Loading CSS context invisibly');
+
+			const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+			const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product&options[prefix]=last`;
+
 			try {
-				const response = await fetch('/collections/all');
-				if (!response.ok) throw new Error('Could not fetch collection page.');
+				const response = await fetch(searchUrl);
+				if (!response.ok) throw new Error(`CSS context request failed: ${response.status}`);
+
 				const html = await response.text();
-				const doc = new DOMParser().parseFromString(html, 'text/html');
-				const cardElement = doc.querySelector(userProductSelector);
-				if (!cardElement) throw new Error(`Could not find a card with selector "${userProductSelector}" on the collection page.`);
-				cardElement.removeAttribute('class'); // Strip all original classes
-				return cardElement.cloneNode(true);
+
+				// Load the full HTML context invisibly - this provides CSS context
+				cssContextContainer.innerHTML = html;
+
+				debugLog('CSS context loaded invisibly', { htmlLength: html.length });
+
+				// Allow time for CSS and scripts to initialize
+				await new Promise(resolve => setTimeout(resolve, 500));
+
+				return html;
 			} catch (error) {
-				throw new Error(`Template fetching failed: ${error.message}`);
+				debugLog('Failed to load CSS context', { error: error.message });
+				throw error;
 			}
 		}
-		async function getProductsData(handles) {
-			debugLog('Fetching product data for handles', handles);
-			const requests = handles.map(handle => fetch(`/products/${handle}.js`).then(res => {
-				if (!res.ok) throw new Error(`404 Not Found for product handle: "${handle}"`);
-				return res.json();
-			}));
-			return await Promise.all(requests);
-		}
 
-		// --- MAIN EXECUTION ---
-		try {
-			const urlParams = new URLSearchParams(window.location.search);
-			const searchTerm = urlParams.get('q');
+		async function renderByScraping(productHandles, selector) {
+			debugLog('Attempting to render via scraping', { selector, handleCount: productHandles.length });
 
-			if (!apiBaseUrl || !apiBaseUrl.startsWith('http')) {
-				throw new Error('API Base URL is not configured correctly.');
-			}
-			if (!searchTerm) {
-				resultsContainer.innerHTML = '<p>Please enter a search term.</p>';
-				return;
+			// STEP 1: Load full HTML context invisibly first
+			const fullHTML = await loadCSSContext(productHandles);
+
+			// STEP 2: Parse and extract product elements
+			const doc = new DOMParser().parseFromString(fullHTML, 'text/html');
+			const productElements = doc.querySelectorAll(selector);
+
+			if (productElements.length === 0) {
+				throw new Error(`Selector "${selector}" not found on the search page. Found elements: ${doc.querySelectorAll('*').length}`);
 			}
 
-			debugLog('Starting execution for term:', searchTerm);
-			const handleResponse = await fetch(`${apiBaseUrl}?query=${encodeURIComponent(searchTerm)}`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-			const handleData = await handleResponse.json();
-			const productHandles = handleData.product_handles;
+			// STEP 3: Process and decode HTML entities
+			const extractedCards = Array.from(productElements).map(el => {
+				let cardHTML = el.outerHTML;
+				cardHTML = decodeHTMLEntities(cardHTML);
+				return cardHTML;
+			});
 
-			if (!productHandles || productHandles.length === 0) {
-				resultsContainer.innerHTML = `<p>No results found for "${searchTerm}".</p>`;
-				return;
+			debugLog('Cards extracted and decoded', { count: extractedCards.length });
+
+			// STEP 4: Create visible grid with the extracted cards
+			if (!resultsContainer) {
+				throw new Error('Results container not available');
 			}
 
-			const [cardTemplate, productsData] = await Promise.all([
-				getCardTemplate(),
-				getProductsData(productHandles)
-			]);
+			const gridWrapper = document.createElement('div');
+			gridWrapper.className = 'couture-flex-grid';
+			gridWrapper.innerHTML = extractedCards.join('');
 
+			// Clear and set content
 			resultsContainer.innerHTML = '';
-			const productGrid = document.createElement('div');
-			productGrid.className = 'couture-flex-grid';
+			resultsContainer.appendChild(gridWrapper);
 
-			productsData.forEach(product => {
-                const card = cardTemplate.cloneNode(true);
-                card.classList.add('couture-flex-item');
+			debugLog('SUCCESS: Products rendered to DOM with CSS context', {
+				gridWrapperChildren: gridWrapper.children.length,
+				containerChildren: resultsContainer.children.length
+			});
 
-                const link = card.querySelector('a');
-                const image = card.querySelector('img');
-
-
-                const titleElements = card.querySelectorAll('.text-block:not(product-price), .h4, .card__heading, .product-card__title, .card-information__text');
-                
-                const priceElements = card.querySelectorAll('.price');
-
-                if (link) {
-                    link.href = product.url;
-                }
-
-                if (image) {
-                    image.src = product.featured_image + '&width=550';
-                    image.srcset = '';
-                    image.loading = 'lazy';
-                    image.alt = product.title;
-                }
-
-                if (titleElements.length > 0) {
-                    titleElements.forEach(el => el.innerHTML = product.title);
-                }
-
-                if (priceElements.length > 0) {
-                    const formattedPrice = new Intl.NumberFormat(undefined, { style: 'currency', currency: '{{ cart.currency.iso_code }}' }).format(product.price / 100);
-                    priceElements.forEach(el => el.innerHTML = formattedPrice);
-                }
-
-                productGrid.appendChild(card);
-            });
-
-			resultsContainer.appendChild(productGrid);
-			debugLog('Render process completed successfully.');
-		} catch (error) {
-			showErrorMessage(error.message);
+			return gridWrapper;
 		}
+
+		async function renderWithAutoDetection(productHandles) {
+			debugLog('No user selector provided, starting auto-detection...');
+			const autoSelectors = ['.grid__item', '.product-grid__item', '.card-wrapper', '.product-card', '.product-item'];
+
+			for (const selector of autoSelectors) {
+				try {
+					const renderedContainer = await renderByScraping(productHandles, selector);
+					debugLog(`Auto-detection successful with selector: "${selector}"`);
+					return renderedContainer;
+				} catch (error) {
+					debugLog(`Auto-detection failed for selector "${selector}": ${error.message}`);
+				}
+			}
+			throw new Error('Auto-detection failed. Could not find a suitable product card selector.');
+		}
+
+		function reinitializeThemeScripts(renderedContainer) {
+			debugLog('Reinitializing theme scripts for new content');
+
+			try {
+				// Dispatch the standard Shopify section load event. This is the most important part.
+				document.dispatchEvent(new CustomEvent('shopify:section:load', {
+					bubbles: true,
+					detail: { sectionId: sectionId }
+				}));
+
+				// Trigger window events for things like lazy loading.
+				window.dispatchEvent(new Event('resize'));
+				window.dispatchEvent(new Event('scroll'));
+
+				// REMOVED: The problematic line that was firing a new 'DOMContentLoaded' event.
+
+				debugLog('Theme script reinitialization complete');
+			} catch (error) {
+				debugLog('Error during script reinitialization', { error: error.message });
+			}
+		}
+
+		// --- MAIN SEARCH LOGIC ---
+		async function performSearch(searchTerm) {
+			debugLog('Starting search execution', { searchTerm });
+
+			// Handle empty search
+			if (!searchTerm || searchTerm.trim() === '') {
+				showEmptyState();
+				return;
+			}
+
+			// Show loading state
+			showLoadingState();
+
+			try {
+				// Validate API configuration
+				if (!apiBaseUrl || !apiBaseUrl.startsWith('http')) {
+					throw new Error('API Base URL is not configured correctly in the theme settings.');
+				}
+
+				// Fetch product handles from API
+				const apiUrl = `${apiBaseUrl}?query=${encodeURIComponent(searchTerm)}`;
+				debugLog('Fetching from API', { apiUrl });
+
+				const handleResponse = await fetch(apiUrl, {
+					headers: { 'ngrok-skip-browser-warning': 'true' }
+				});
+
+				if (!handleResponse.ok) {
+					throw new Error(`API request failed with status: ${handleResponse.status}`);
+				}
+
+				const handleData = await handleResponse.json();
+				const productHandles = handleData.product_handles;
+
+				debugLog('API Response received', {
+					handleCount: productHandles ? productHandles.length : 0,
+					handles: productHandles
+				});
+
+				// Handle empty results
+				if (!productHandles || productHandles.length === 0) {
+					showEmptyState(searchTerm);
+					return;
+				}
+
+				// Update results count
+				if (resultsCountEl) {
+					resultsCountEl.textContent = `${productHandles.length} results`;
+				}
+
+				// Render products with CSS context
+				let renderedContainer;
+				if (userProductSelector && userProductSelector.trim()) {
+					debugLog('Using user-provided selector', { selector: userProductSelector });
+					renderedContainer = await renderByScraping(productHandles, userProductSelector);
+				} else {
+					renderedContainer = await renderWithAutoDetection(productHandles);
+				}
+
+				// Reinitialize theme scripts
+				reinitializeThemeScripts(renderedContainer);
+
+				debugLog('Search execution completed successfully');
+
+			} catch (error) {
+				debugLog('Search execution failed', { error: error.message, stack: error.stack });
+				showErrorMessage(error.message);
+			}
+		}
+
+		// --- Event Listeners ---
+		searchForm.addEventListener('submit', function (event) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			const searchTerm = searchInput.value.trim();
+			debugLog('Form submitted', { searchTerm });
+
+			performSearch(searchTerm);
+		});
+
+		// Handle initial search from URL parameter
+		const initialSearchTerm = new URLSearchParams(window.location.search).get('q');
+		if (initialSearchTerm) {
+			debugLog('Initial search from URL', { initialSearchTerm });
+			searchInput.value = initialSearchTerm;
+			performSearch(initialSearchTerm);
+		}
+
+		debugLog('Event listeners attached, ready for searches');
 	});
 </script>
 
@@ -176,8 +369,8 @@ Final Production-Ready Version:
       "type": "text",
       "id": "user_product_selector",
       "label": "Product Card CSS Selector (Optional)",
-      "info": "Example: '.product-grid__item'. Leave blank to use a common default.",
-      "placeholder": ".product-grid__item"
+      "info": "Example: '.grid__item'. Leave blank to auto-detect.",
+      "placeholder": ".grid__item"
     },
     {
       "type": "header",
@@ -194,49 +387,128 @@ Final Production-Ready Version:
 {% endschema %}
 
 <style>
-	/* --- The Flexbox Grid Solution --- */
+	/* --- STYLES for Search Bar and Controls --- */
+	.couture-search-header {
+		margin-bottom: 30px;
+	}
 
-	/* 1. The Flex Container */
+	.couture-search-form {
+		position: relative;
+		margin-bottom: 20px;
+	}
+
+	.couture-search-input {
+		width: 100%;
+		padding: 12px 40px 12px 16px;
+		font-size: 16px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		box-sizing: border-box;
+	}
+
+	.couture-search-button {
+		position: absolute;
+		top: 0;
+		right: 0;
+		height: 100%;
+		width: 45px;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #555;
+	}
+
+	.couture-controls-toolbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-bottom: 15px;
+		border-bottom: 1px solid #eee;
+		font-size: 14px;
+		color: #555;
+		flex-wrap: wrap;
+		gap: 15px;
+	}
+
+	.couture-controls-left,
+	.couture-controls-right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.couture-filter-dropdown,
+	.couture-sort-dropdown {
+		padding: 6px 10px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		background-color: #fff;
+	}
+
+	/* --- STYLES for the Product Grid --- */
 	.couture-flex-grid {
 		display: flex;
 		flex-wrap: wrap;
 		margin: 0 -10px;
-		/* ADDED: Remove list dots and padding */
 		padding: 0;
 		list-style: none;
+		min-height: 200px;
 	}
 
-	/* 2. The Flex Items (Product Cards) */
-	.couture-flex-item {
+	.couture-flex-grid>* {
 		box-sizing: border-box;
 		padding: 0 10px;
 		margin-bottom: 30px;
 		list-style: none;
 		flex-basis: 50%;
-		/* Mobile: 2 columns */
 	}
 
-	/* Tablet and up: 4 columns */
 	@media screen and (min-width: 750px) {
-		.couture-flex-item {
+		.couture-flex-grid>* {
 			flex-basis: 25%;
 		}
 	}
 
-	/* Wide desktops: 5 columns */
 	@media screen and (min-width: 1200px) {
-		.couture-flex-item {
+		.couture-flex-grid>* {
 			flex-basis: 20%;
 		}
 	}
 
-	/* 3. Image Styles */
-	.couture-flex-item img {
+	/* Ensure proper image loading and animations */
+	.couture-flex-grid img {
+		display: block;
 		width: 100%;
 		height: auto;
-		aspect-ratio: 4 / 5;
 		object-fit: cover;
-		display: block;
-		margin-bottom: 10px;
+		background-color: #f5f5f5;
+	}
+
+	.couture-flex-grid .card__content,
+	.couture-flex-grid .card-information,
+	.couture-flex-grid .product-card__info {
+		text-align: left;
+		text-decoration: none;
+	}
+
+	.couture-flex-grid a {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	/* Ensure results container is visible */
+	.couture-results-grid {
+		min-height: 100px;
+		position: relative;
+	}
+
+	/* Debug panel improvements */
+	.couture-debug-panel {
+		position: relative;
+		z-index: 10;
+		margin-bottom: 20px;
 	}
 </style>

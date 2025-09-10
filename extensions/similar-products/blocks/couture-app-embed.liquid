@@ -1,0 +1,12 @@
+{% comment %}
+  This app embed block uses the schema to automatically and safely load
+  the redirect script on every page of the store.
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "Couture Search Redirect",
+  "target": "body",
+  "javascript": "couture-search-redirect.js"
+}
+{% endschema %}
