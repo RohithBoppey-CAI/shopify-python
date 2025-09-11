@@ -1,0 +1,159 @@
+/* --- Autocomplete Popup Styling --- */
+
+/* Make the search form the positioning anchor for the popup */
+form[action="/search"] {
+    position: relative;
+}
+
+/* The main popup container */
+.couture-autocomplete-popup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    /* width: 620px; */
+    background: white;
+    border: 1px solid #ddd;
+    z-index: 1001;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+}
+
+/* The two-column wrapper now has a fixed height and acts as the boundary */
+.couture-autocomplete-wrapper {
+    display: flex;
+    height: 500px;
+    /* Use height instead of max-height for a fixed boundary */
+    overflow: hidden;
+}
+
+/* THIS IS THE KEY FIX: Independent scrolling for each panel */
+.couture-autocomplete-wrapper .left-panel,
+.couture-autocomplete-wrapper .right-panel {
+    padding: 20px;
+    overflow-y: auto;
+    /* Each panel gets its own scrollbar */
+    min-height: 0;
+    /* A flexbox fix to ensure overflow works correctly */
+
+    /* Add a subtle scrollbar style for webkit browsers */
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f1f1f1;
+}
+
+.couture-autocomplete-wrapper .left-panel::-webkit-scrollbar,
+.couture-autocomplete-wrapper .right-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.couture-autocomplete-wrapper .left-panel::-webkit-scrollbar-thumb,
+.couture-autocomplete-wrapper .right-panel::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 3px;
+}
+
+/* Left Panel (Suggestions & Categories) */
+.couture-autocomplete-wrapper .left-panel {
+    flex-basis: 40%;
+    border-right: 1px solid #f0f0f0;
+}
+
+/* Right Panel (Products) */
+.couture-autocomplete-wrapper .right-panel {
+    flex-basis: 60%;
+}
+
+/* Section Headers (e.g., "Suggestions", "Products") */
+.couture-autocomplete-wrapper h5 {
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.couture-autocomplete-wrapper ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Styling for Suggestion and Category list items */
+.couture-autocomplete-wrapper .suggestions-container ul li,
+.couture-autocomplete-wrapper .categories-container ul li {
+    padding: 10px 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.couture-autocomplete-wrapper .suggestions-container ul li:hover,
+.couture-autocomplete-wrapper .categories-container ul li:hover {
+    background: #f5f5f5;
+}
+
+/* Search icon next to suggestions */
+.couture-autocomplete-wrapper .suggestion-icon {
+    width: 18px;
+    height: 18px;
+    stroke: #888;
+    /* Use stroke for line icons */
+    flex-shrink: 0;
+}
+
+/* Products Grid */
+.products-container ul {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    /* Two-column grid */
+    gap: 20px;
+}
+
+/* Individual Product Item Link */
+.products-container ul li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #333;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.products-container ul li a:hover {
+    background: #f9f9f9;
+}
+
+/* Product details within the link */
+.products-container .product-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.products-container .product-name {
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.products-container .product-price {
+    color: #006bb4;
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+
+.couture-autocomplete-product-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 15px;
+}
+
+.couture-autocomplete-product-list li .card__heading {
+  font-size: 14px; /* Make the title smaller for the dropdown */
+}
