@@ -1,4 +1,5 @@
 *.env
+*env.prod
 **/__pycache__/
 **/search-env/
 **/*.json
@@ -6,6 +7,9 @@
 
 # for development purposes
 **/*dummycouture*
+**/couturedev*
+**/tokens/
+**/downloads/
 
 # remove any sqlite files
 **/*.db

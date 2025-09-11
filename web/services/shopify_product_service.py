@@ -81,7 +81,7 @@ def get_last_sync_status(client: ShopifyAPIClient) -> dict:
         try:
             products = read_jsonl_from_url(status_data["url"])
             save_to_json(
-                filename=f"{client.shop_url}_{filename_key}.jsonl", data_dict=products
+                filename=f"downloads/{client.shop_url}_{filename_key}.jsonl", data_dict=products
             )
         except Exception as e:
             print(f"Cannot save information for {filename_key}: {e}")
