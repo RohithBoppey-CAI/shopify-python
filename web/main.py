@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from models.database import create_db_and_tables
+from models.database import create_db_and_tables, create_folders
 from services.shopify_auth_service import verify_hmac_signature, get_shop_access_token
 from routers import auth_router, sync_router, api_router
 
@@ -14,12 +14,14 @@ app = FastAPI(title="Couture Search Shopify App")
 def on_startup():
     """Initialize database tables on startup"""
     create_db_and_tables()
+    create_folders(folders=["downloads", "tokens"])
 
 
 # CORS Configuration
 origins = [
     "https://dummycouture.myshopify.com",
     "https://admin.shopify.com",
+    "*",  # contains the list of stores
 ]
 
 app.add_middleware(

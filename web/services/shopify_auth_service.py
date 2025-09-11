@@ -43,7 +43,7 @@ def exchange_code_for_token(shop: str, code: str):
     print(f"Access Token for {shop}: {access_token}")
 
     # For now, we'll save it to a temporary file for demonstration
-    with open(f"{shop}_token.txt", "w") as f:
+    with open(f"./tokens/{shop}_token.txt", "w") as f:
         f.write(access_token)
 
     return access_token

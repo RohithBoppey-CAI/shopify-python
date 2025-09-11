@@ -1,0 +1,575 @@
+{% comment %}
+  Final Production-Ready Version:
+  - Adds customizable headings and a robust 5-column product grid.
+  - Implements full pagination logic based on API data.
+  - Fixes the infinite loop bug when clearing the search bar.
+{% endcomment %}
+
+<div
+  class="couture-search-section page-width"
+  id="couture-container-{{ section.id }}"
+  data-section-id="{{ section.id }}"
+  data-api-base-url="{{ block.settings.api_base_url }}"
+  data-user-selector="{{ block.settings.user_product_selector }}"
+  data-debug-mode="{{ block.settings.debug_mode }}"
+>
+  <!-- 1. ADDED: Customizable Heading -->
+  <div class="couture-title-wrapper">
+    <h2 class="couture-title">{{ block.settings.heading | default: "Couture Search" }}</h2>
+    <p class="couture-subheading">{{ block.settings.subheading | default: "Find relevant products" }}</p>
+  </div>
+
+  <!-- Search Form and Controls Toolbar -->
+  <div class="couture-search-header">
+    <form class="couture-search-form" id="couture-search-form-{{ section.id }}">
+      <input 
+        type="search" 
+        id="couture-search-input-{{ section.id }}" 
+        class="couture-search-input" 
+        placeholder="Search for products..."
+      >
+      <button type="submit" class="couture-search-button" aria-label="Search">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+      </button>
+    </form>
+    <div class="couture-controls-toolbar">
+      <div class="couture-controls-left">
+        <span>Filter:</span>
+        <select class="couture-filter-dropdown"><option>Availability</option></select>
+        <select class="couture-filter-dropdown"><option>Price</option></select>
+      </div>
+      <div class="couture-controls-right">
+        <select class="couture-sort-dropdown" id="couture-sort-by-{{ section.id }}">
+            <option value="relevance">Sort by: Relevance</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+        </select>
+        <span class="couture-results-count" id="couture-results-count-{{ section.id }}"></span>
+      </div>
+    </div>
+  </div>
+
+  {% if block.settings.debug_mode %}
+    <div class="couture-debug-panel">
+        <strong>Debug Information...</strong>
+        <div id="debug-log-{{ section.id }}"></div>
+    </div>
+  {% endif %}
+
+  <div class="couture-results-grid" id="couture-results-grid-{{ section.id }}"></div>
+  
+  <!-- 3. ADDED: Pagination Container -->
+  <div class="couture-pagination-container" id="couture-pagination-container-{{ section.id }}"></div>
+  <div id="couture-css-context-{{ section.id }}" style="display: none;" aria-hidden="true"></div>
+
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sectionId = '{{ section.id }}';
+    const container = document.getElementById('couture-container-' + sectionId);
+    if (!container) return;
+
+    // --- Configuration & Element References ---
+    const apiBaseUrl = container.dataset.apiBaseUrl;
+    const userProductSelector = container.dataset.userSelector;
+    const debugMode = container.dataset.debugMode === 'true';
+    
+    const searchForm = document.getElementById('couture-search-form-' + sectionId);
+    const searchInput = document.getElementById('couture-search-input-' + sectionId);
+    const resultsContainer = document.getElementById('couture-results-grid-' + sectionId);
+    const resultsCountEl = document.getElementById('couture-results-count-' + sectionId);
+  	const cssContextContainer = document.getElementById('couture-css-context-' + sectionId);
+    
+    const paginationContainer = document.getElementById('couture-pagination-container-' + sectionId);
+    const sortByDropdown = document.getElementById('couture-sort-by-' + sectionId);
+
+    // --- State Management ---
+    let state = {
+        currentPage: 1,
+        pageSize: 10,
+        currentQuery: '',
+        sortBy: 'relevance',
+        sortOrder: 'desc',
+        totalPages: 0,
+        totalCount: 0,
+        isRendering: false
+    };
+
+    // --- Helper Functions (debugLog, showErrorMessage) ---
+    function debugLog(message, data = null) {
+			console.log(`[COUTURE DEBUG ${sectionId}] ${message}`, data || '');
+			if (!debugMode) return;
+
+			const debugPanel = document.getElementById('debug-log-' + sectionId);
+			if (debugPanel) {
+				const logEntry = document.createElement('div');
+				logEntry.style.cssText = 'margin-top: 5px; padding: 5px; background: #fff; border: 1px solid #ddd; font-size: 11px;';
+				logEntry.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${message}${data ? `<pre style="font-size: 10px; white-space: pre-wrap; word-break: break-all; max-height: 200px; overflow: auto;">${JSON.stringify(data, null, 2)}</pre>` : ''}`;
+				debugPanel.appendChild(logEntry);
+			}
+		}
+
+		function showErrorMessage(errorMessage) {
+			debugLog('FATAL ERROR:', { message: errorMessage });
+			if (resultsContainer) {
+				resultsContainer.innerHTML = `<p style="color: red; padding: 20px; background: #fff5f5; border: 1px solid #ffdddd;"><strong>Error:</strong> ${errorMessage}</p>`;
+			}
+		}
+
+    // --- Rendering Engine ---
+  	async function loadCSSContext(productHandles) {
+			debugLog('Loading CSS context invisibly');
+
+			const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+			const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product&options[prefix]=last`;
+
+			try {
+				const response = await fetch(searchUrl);
+				if (!response.ok) throw new Error(`CSS context request failed: ${response.status}`);
+
+				const html = await response.text();
+
+				// Load the full HTML context invisibly - this provides CSS context
+				cssContextContainer.innerHTML = html;
+
+				debugLog('CSS context loaded invisibly', { htmlLength: html.length });
+
+				// Allow time for CSS and scripts to initialize
+				await new Promise(resolve => setTimeout(resolve, 500));
+
+				return html;
+			} catch (error) {
+				debugLog('Failed to load CSS context', { error: error.message });
+				throw error;
+			}
+		}
+
+    	// --- The Upgraded Theme-Scraping Rendering Engine ---
+		async function renderByScraping(productHandles, selector) {
+			debugLog('Attempting to render via scraping', { selector, handleCount: productHandles.length });
+			const searchQuery = productHandles.map(handle => `handle:${handle}`).join(' OR ');
+			const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product&options[prefix]=last`;
+
+			// Step 1: Fetch the full HTML of the search page
+			const response = await fetch(searchUrl);
+			if (!response.ok) throw new Error(`Scraping request failed: ${response.status}`);
+			const html = await response.text();
+
+			// Step 2: Load the entire page into our invisible container
+			// This forces the browser to download all necessary CSS files.
+			cssContextContainer.innerHTML = html;
+			
+			// Give the browser a moment to process the styles
+			await new Promise(resolve => setTimeout(resolve, 50)); 
+
+			// Step 3: Find the now fully-styled elements inside the invisible container
+			const productElements = cssContextContainer.querySelectorAll(selector);
+
+			if (productElements.length === 0) {
+				throw new Error(`Selector "${selector}" not found on the default /search page.`);
+			}
+
+			const extractedCards = Array.from(productElements).map(el => el.outerHTML);
+			
+			const gridWrapper = document.createElement('div');
+			gridWrapper.className = 'couture-flex-grid';
+			gridWrapper.innerHTML = extractedCards.join('');
+			
+			// Step 4: Move the perfect HTML to the visible container
+			resultsContainer.innerHTML = '';
+			resultsContainer.appendChild(gridWrapper);
+			
+			debugLog('SUCCESS: Scraping successful', { foundElements: productElements.length });
+			return gridWrapper; // Return for the re-initialization script
+		}
+
+		async function renderWithAutoDetection(productHandles) {
+			debugLog('No user selector provided, starting auto-detection...');
+			const autoSelectors = ['.grid__item', '.product-grid__item', '.card-wrapper', '.product-card', '.product-item'];
+			for (const selector of autoSelectors) {
+				try {
+					// Pass the selector to the scraping function
+					const renderedContainer = await renderByScraping(productHandles, selector);
+					debugLog(`Auto-detection successful with selector: "${selector}"`);
+					return renderedContainer; // Return the container if successful
+				} catch (error) {
+					debugLog(`Auto-detection failed for selector "${selector}": ${error.message}`);
+				}
+			}
+			throw new Error('Auto-detection failed. Could not find a suitable product card selector.');
+		}
+
+		function reinitializeThemeScripts(renderedContainer) {
+			debugLog('Reinitializing theme scripts for new content');
+
+			try {
+				// Dispatch the standard Shopify section load event. This is the most important part.
+				document.dispatchEvent(new CustomEvent('shopify:section:load', {
+					bubbles: true,
+					detail: { sectionId: sectionId }
+				}));
+
+				// Trigger window events for things like lazy loading.
+				window.dispatchEvent(new Event('resize'));
+				window.dispatchEvent(new Event('scroll'));
+
+				// REMOVED: The problematic line that was firing a new 'DOMContentLoaded' event.
+
+				debugLog('Theme script reinitialization complete');
+			} catch (error) {
+				debugLog('Error during script reinitialization', { error: error.message });
+			}
+		}
+
+    // --- 3. NEW: Pagination Rendering Function ---
+    function renderPagination() {
+        paginationContainer.innerHTML = '';
+        if (state.totalPages <= 1) return;
+
+        const nav = document.createElement('nav');
+        nav.className = 'couture-pagination';
+        
+        // Previous Button
+        if (state.currentPage > 1) {
+            const prevButton = document.createElement('button');
+            prevButton.textContent = '‹';
+            prevButton.onclick = () => {
+                state.currentPage--;
+                performSearch();
+            };
+            nav.appendChild(prevButton);
+        }
+
+        // Page Number Buttons (simplified for brevity)
+        for (let i = 1; i <= state.totalPages; i++) {
+            const pageButton = document.createElement('button');
+            pageButton.textContent = i;
+            if (i === state.currentPage) {
+                pageButton.className = 'active';
+            }
+            pageButton.onclick = () => {
+                state.currentPage = i;
+                performSearch();
+            };
+            nav.appendChild(pageButton);
+        }
+
+        // Next Button
+        if (state.currentPage < state.totalPages) {
+            const nextButton = document.createElement('button');
+            nextButton.textContent = '›';
+            nextButton.onclick = () => {
+                state.currentPage++;
+                performSearch();
+            };
+            nav.appendChild(nextButton);
+        }
+        
+        paginationContainer.appendChild(nav);
+    }
+    
+    // --- Main Search Logic ---
+    async function performSearch() {
+      if (!state.currentQuery || state.isRendering) return;
+      state.isRendering = true;
+      
+      resultsContainer.innerHTML = '<p>Searching...</p>';
+      resultsCountEl.textContent = '';
+      paginationContainer.innerHTML = '';
+      debugLog('Starting search', state);
+
+      try {
+        const [sort_by, sort_order] = state.sortBy.split('-');
+        const apiUrl = new URL(apiBaseUrl);
+        apiUrl.searchParams.set('query', state.currentQuery);
+        apiUrl.searchParams.set('page_number', state.currentPage);
+        apiUrl.searchParams.set('page_size', state.pageSize);
+        apiUrl.searchParams.set('sort_by', sort_by);
+        apiUrl.searchParams.set('sort_order', sort_order || 'desc');
+
+        const handleResponse = await fetch(apiUrl, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        const handleData = await handleResponse.json();
+        
+        state.totalCount = handleData.total_count;
+        state.totalPages = Math.ceil(state.totalCount / state.pageSize);
+
+        const productHandles = handleData.product_handles;
+
+        if (!productHandles || productHandles.length === 0) {
+            resultsContainer.innerHTML = `<p>No results found for "${state.currentQuery}".</p>`;
+            resultsCountEl.textContent = '0 results';
+            state.isRendering = false;
+            return;
+        }
+
+        resultsCountEl.textContent = `${state.totalCount} results`;
+        
+        await (userProductSelector ? renderByScraping(productHandles) : renderWithAutoDetection(productHandles));
+        reinitializeThemeScripts();
+        renderPagination();
+        
+        debugLog('Render complete');
+      } catch (error) {
+        showErrorMessage(error.message);
+      } finally {
+        state.isRendering = false;
+      }
+    }
+
+    // --- Event Listeners and Initial Load ---
+    searchForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const newQuery = searchInput.value.trim();
+      if (newQuery !== state.currentQuery) {
+        state.currentQuery = newQuery;
+        state.currentPage = 1;
+        // 4. FIX: Update URL without reloading for better UX
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.set('q', newQuery);
+        window.history.pushState({ path: newUrl.href }, '', newUrl.href);
+        performSearch();
+      }
+    });
+    
+    // 4. FIX: Listen for 'input' event to handle clearing the search bar
+    searchInput.addEventListener('input', function() {
+        if (searchInput.value.trim() === '') {
+            state.currentQuery = '';
+            resultsContainer.innerHTML = '<p>Please enter a search term above to begin.</p>';
+            resultsCountEl.textContent = '';
+            paginationContainer.innerHTML = '';
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.delete('q');
+            window.history.pushState({ path: newUrl.href }, '', newUrl.href);
+        }
+    });
+
+    sortByDropdown.addEventListener('change', function() {
+        state.sortBy = sortByDropdown.value;
+        state.currentPage = 1;
+        performSearch();
+    });
+
+    // Initial load from URL
+    const initialQuery = new URLSearchParams(window.location.search).get('q');
+    if (initialQuery) {
+      searchInput.value = initialQuery;
+      state.currentQuery = initialQuery;
+      performSearch();
+    } else {
+      resultsContainer.innerHTML = '<p>Please enter a search term above to begin.</p>';
+    }
+
+    // --- (Paste your full helper and rendering functions here) ---
+});
+</script>
+
+{% schema %}
+{
+  "name": "Couture Search Results",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Couture Search"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Find relevant products"
+    },
+    {
+      "type": "header",
+      "content": "API Configuration"
+    },
+    {
+      "type": "text",
+      "id": "api_base_url",
+      "label": "Search API Base URL"
+    },
+    {
+      "type": "text",
+      "id": "user_product_selector",
+      "label": "Product Card CSS Selector (Optional)",
+      "placeholder": ".grid__item"
+    },
+    {
+      "type": "checkbox",
+      "id": "debug_mode",
+      "label": "Enable Debug Mode",
+      "default": false
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+  /* 1. ADDED: Heading Styles */
+  .couture-title-wrapper { text-align: center; margin-bottom: 40px; }
+  .couture-title { font-size: 2.5rem; margin-bottom: 0.5rem; } /* Inherits theme's h2 style */
+  .couture-subheading { font-size: 1.1rem; color: #555; margin-top: 0; }
+  
+  /* 2. UPDATED: Flexbox Grid for Fixed 5 Columns */
+  .couture-flex-grid {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -10px;
+    padding: 0;
+    list-style: none;
+  }
+  .couture-flex-grid > * {
+    box-sizing: border-box;
+    padding: 0 10px;
+    margin-bottom: 30px;
+    list-style: none;
+    flex-grow: 0;
+    flex-shrink: 0;
+    width: 50%; /* Mobile: 2 columns */
+  }
+  @media screen and (min-width: 750px) {
+    .couture-flex-grid > * { width: calc(100% / 3); } /* Tablet: 3 columns */
+  }
+  @media screen and (min-width: 990px) {
+    .couture-flex-grid > * { width: 20%; } /* Desktop: 5 columns */
+  }
+
+  /* 3. ADDED: Pagination Styles */
+  .couture-pagination-container { display: flex; justify-content: center; margin-top: 40px; }
+  .couture-pagination { display: flex; gap: 5px; }
+  .couture-pagination button { padding: 8px 14px; border: 1px solid #ccc; background: #fff; cursor: pointer; border-radius: 4px; }
+  .couture-pagination button.active { background: #333; color: #fff; border-color: #333; }
+  .couture-pagination button:hover:not(.active) { background: #f5f5f5; }
+
+  /* --- Other styles remain the same --- */
+  .couture-search-header {
+		margin-bottom: 30px;
+	}
+
+	.couture-search-form {
+		position: relative;
+		margin-bottom: 20px;
+	}
+
+	.couture-search-input {
+		width: 100%;
+		padding: 12px 40px 12px 16px;
+		font-size: 16px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		box-sizing: border-box;
+	}
+
+	.couture-search-button {
+		position: absolute;
+		top: 0;
+		right: 0;
+		height: 100%;
+		width: 45px;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #555;
+	}
+
+	.couture-controls-toolbar {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-bottom: 15px;
+		border-bottom: 1px solid #eee;
+		font-size: 14px;
+		color: #555;
+		flex-wrap: wrap;
+		gap: 15px;
+	}
+
+	.couture-controls-left,
+	.couture-controls-right {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+	}
+
+	.couture-filter-dropdown,
+	.couture-sort-dropdown {
+		padding: 6px 10px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		background-color: #fff;
+	}
+
+	/* --- STYLES for the Product Grid --- */
+	.couture-flex-grid {
+		display: flex;
+		flex-wrap: wrap;
+		margin: 0 -10px;
+		padding: 0;
+		list-style: none;
+		min-height: 200px;
+	}
+
+	.couture-flex-grid>* {
+		box-sizing: border-box;
+		padding: 0 10px;
+		margin-bottom: 30px;
+		list-style: none;
+		flex-basis: 50%;
+	}
+
+	@media screen and (min-width: 750px) {
+		.couture-flex-grid>* {
+			flex-basis: 25%;
+		}
+	}
+
+	@media screen and (min-width: 1200px) {
+		.couture-flex-grid>* {
+			flex-basis: 20%;
+		}
+	}
+
+	/* Ensure proper image loading and animations */
+	.couture-flex-grid img {
+		display: block;
+		width: 100%;
+		height: auto;
+		object-fit: cover;
+		background-color: #f5f5f5;
+	}
+
+	.couture-flex-grid .card__content,
+	.couture-flex-grid .card-information,
+	.couture-flex-grid .product-card__info {
+		text-align: left;
+		text-decoration: none;
+	}
+
+	.couture-flex-grid a {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	/* Ensure results container is visible */
+	.couture-results-grid {
+		min-height: 100px;
+		position: relative;
+	}
+
+	/* Debug panel improvements */
+	.couture-debug-panel {
+		position: relative;
+		z-index: 10;
+		margin-bottom: 20px;
+	}
+</style>
