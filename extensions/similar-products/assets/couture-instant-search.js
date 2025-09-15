@@ -1,174 +1,219 @@
 (function () {
     'use strict';
-
     const API_URL = 'https://d768bf47be7c.ngrok-free.app/api/reco/autosuggest/results';
+    let ui = {}; // UI elements cache
 
-    // This renders the main layout (suggestions, categories)
-    function renderAutocomplete(data, popup) {
-        if (!data || (!data.suggestions?.length && !data.categories?.length && !data.product_ids?.length)) {
-            popup.style.display = 'none';
-            return;
-        }
-
-        // This HTML structure is taken directly from your Magento logic
-        let html = `<div class="couture-autocomplete-wrapper">
-                    <div class="left-panel">
-                        <div class="suggestions-container"></div>
-                        <div class="categories-container" style="margin-top: 20px;"></div>
-                    </div>
-                    <div class="right-panel">
-                        <div class="products-container"></div>
-                    </div>
-                </div>`;
-        popup.innerHTML = html;
-
-        // Render suggestions
-        const suggestionsContainer = popup.querySelector('.suggestions-container');
-        if (data.suggestions && data.suggestions.length) {
-            const searchIconSvg = `<svg class="suggestion-icon" ... ></svg>`; // Your SVG code here
-            suggestionsContainer.innerHTML = `<h5>Suggestions</h5><ul>${data.suggestions.map(s => `<li>${searchIconSvg}<span>${s}</span></li>`).join('')}</ul>`;
-
-
-            suggestionsContainer.addEventListener('click', event => {
-                const listItem = event.target.closest('li');
-                if (listItem) {
-                    const query = listItem.textContent.trim();
-                    if (query) {
-                        // Redirect to the custom search page with the clicked query
-                        window.location.href = `/pages/couture-search?q=${encodeURIComponent(query)}`;
-                    }
-                }
-            });
-
-
-        }
-
-        // Render categories
-        const categoriesContainer = popup.querySelector('.categories-container');
-        if (data.categories && data.categories.length) {
-            categoriesContainer.innerHTML = `<h5>Categories</h5><ul>${data.categories.map(c => `<li>${c.name} (${c.count})</li>`).join('')}</ul>`;
-        }
-
-        // Fetch and render products
-        const productsContainer = popup.querySelector('.products-container');
-        if (data.product_ids && data.product_ids.length) {
-            callProductApi(data.product_ids, productsContainer);
-        } else {
-            productsContainer.innerHTML = '<h5>Products</h5><div>No products to display.</div>';
-        }
-    }
-
-    // This fetches Shopify product data and renders the products
-    // This new version uses the theme-scraping method
-    async function callProductApi(handles, container) {
-        container.innerHTML = '<h5>Products</h5><div>Loading products...</div>';
-        try {
-            // A list of common selectors to try
-            const autoSelectors = ['.grid__item', '.product-grid__item', '.card-wrapper'];
-
-            // 1. Construct a single search URL with all the product handles
-            const searchQuery = handles.map(handle => `handle:${handle}`).join(' OR ');
-            const searchUrl = `/search?q=${encodeURIComponent(searchQuery)}&type=product&options[prefix]=last`;
-
-            // 2. Fetch the pre-rendered HTML from the default search page
-            const response = await fetch(searchUrl);
-            if (!response.ok) throw new Error('Scraping request failed');
-            const html = await response.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-
-            // 3. Find the product cards using our auto-detection logic
-            let productElements = [];
-            for (const selector of autoSelectors) {
-                productElements = doc.querySelectorAll(selector);
-                if (productElements.length > 0) break;
-            }
-
-            if (productElements.length === 0) throw new Error('Could not find product cards on search page.');
-
-            // 4. Extract and inject the perfect HTML
-            const productHtml = Array.from(productElements).map(el => `<li>${el.innerHTML}</li>`).join('');
-            container.innerHTML = `<h5>Products</h5><ul class="couture-autocomplete-product-list">${productHtml}</ul>`;
-
-        } catch (error) {
-            console.error('Error fetching product data:', error);
-            container.innerHTML = '<h5>Products</h5><div>Error loading products.</div>';
-        }
-    }
-
-    // A simple debounce utility
-    function debounce(func, delay) {
+    const debounce = (func, delay) => {
         let timeout;
-        return function (...args) {
+        return (...args) => {
             clearTimeout(timeout);
-            timeout = setTimeout(() => func.apply(this, args), delay);
+            timeout = setTimeout(() => func(...args), delay);
         };
-    }
+    };
 
-    // This function will contain all the logic
-    // Replace the existing initializeAutocomplete function with this one
-    function initializeAutocomplete(searchInput) {
-        const searchForm = searchInput.closest('form');
-        if (!searchForm) return;
+    /**
+     * Finds search triggers, clones them to remove theme event listeners, 
+     * and attaches our own click handler.
+     */
+    const hijackSearchTriggers = () => {
+        const selectors = 'a[href*="/search"], button[aria-label*="search" i], .search-action, summary[aria-label*="search" i]';
+        document.querySelectorAll(selectors).forEach(trigger => {
+            if (trigger.dataset.coutureHijacked) return;
 
-        // 1. Create the popup and attach it to the document body
-        const popup = document.createElement('div');
-        popup.className = 'couture-autocomplete-popup';
-        popup.style.display = 'none';
-        document.body.appendChild(popup); // Attach to body, not the form
+            const clone = trigger.cloneNode(true);
+            trigger.parentNode.replaceChild(clone, trigger);
+            clone.dataset.coutureHijacked = true;
 
-        // 2. Create a function to show and position the popup
-        function showAndPositionPopup() {
-            const rect = searchInput.getBoundingClientRect();
-            popup.style.left = `${rect.left + window.scrollX}px`;
-            popup.style.top = `${rect.bottom + window.scrollY}px`;
-            popup.style.width = `${rect.width}px`; // Match the width of the search input
-            popup.style.display = 'block';
-        }
+            clone.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                
+                // CRITICAL FIX: Aggressively and persistently unlock page scrolling.
+                const unlockScroll = () => {
+                    document.body.style.overflow = '';
+                    document.documentElement.style.overflow = '';
+                    document.body.classList.remove('overflow-hidden', 'scroll-lock', 'modal-open');
+                    document.documentElement.classList.remove('overflow-hidden', 'scroll-lock', 'modal-open');
+                };
 
-        const debouncedSearch = debounce(query => {
-            callSearchApi(query, popup, showAndPositionPopup); // Pass the positioning function
-        }, 300);
+                unlockScroll(); // Run immediately
+                setTimeout(unlockScroll, 10); // Run again after a delay to override theme scripts
 
-        // 3. Attach event listeners
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim();
+                showCustomSearch(clone);
+            }, true);
+        });
+    };
+
+    /**
+     * Creates our custom search UI elements once.
+     */
+    const createCustomSearchUI = () => {
+        if (ui.container) return;
+        
+        ui.container = document.createElement('div');
+        ui.container.className = 'couture-custom-search-container';
+        
+        ui.input = document.createElement('input');
+        ui.input.type = 'search';
+        ui.input.placeholder = 'Search...';
+        ui.input.className = 'couture-custom-input';
+
+        ui.resultsPopup = document.createElement('div');
+        ui.resultsPopup.className = 'couture-autocomplete-popup';
+
+        ui.container.append(ui.input, ui.resultsPopup);
+        document.body.appendChild(ui.container);
+        
+        setupEventListeners();
+    };
+
+    /**
+     * Shows and positions the custom search UI below the clicked element.
+     */
+    const showCustomSearch = (clickedEl) => {
+        const rect = clickedEl.getBoundingClientRect();
+        ui.container.style.left = `${rect.left}px`;
+        ui.container.style.top = `${rect.bottom + 8}px`; 
+        ui.container.style.display = 'block';
+        ui.input.focus();
+        ui.input.value = '';
+        ui.resultsPopup.style.display = 'none';
+    };
+
+    const hideCustomSearch = () => {
+        if (ui.container) ui.container.style.display = 'none';
+    };
+    
+    /**
+     * Sets up all event listeners for our custom search input.
+     */
+    const setupEventListeners = () => {
+        const debouncedSearch = debounce(query => callSearchApi(query), 300);
+
+        ui.input.addEventListener('input', () => {
+            const query = ui.input.value.trim();
             if (query.length < 3) {
-                popup.style.display = 'none';
+                ui.resultsPopup.style.display = 'none';
                 return;
             }
             debouncedSearch(query);
         });
+        
+        ui.input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const query = ui.input.value.trim();
+                if (query) window.location.href = `/search?q=${encodeURIComponent(query)}`;
+            }
+            if (e.key === 'Escape') hideCustomSearch();
+        });
 
-        // (Your form submit and document click listeners remain the same)
-        searchForm.addEventListener('submit', event => { /* ... */ });
-        document.addEventListener('click', event => { /* ... */ });
-
-        // Reposition on window resize
-        window.addEventListener('resize', () => {
-            if (popup.style.display === 'block') {
-                showAndPositionPopup();
+        document.addEventListener('click', e => {
+            const isTrigger = e.target.closest('[data-couture-hijacked]');
+            if (ui.container && !ui.container.contains(e.target) && !isTrigger) {
+                hideCustomSearch();
             }
         });
-    }
-
-    // Also, make a small update to the callSearchApi function to use the new positioning function
-    async function callSearchApi(query, popup, positioningFunction) {
-        positioningFunction(); // Position the popup first
-        popup.innerHTML = '<div>Loading...</div>';
-
+    };
+    
+    /**
+     * API call and rendering logic.
+     */
+    const callSearchApi = async (query) => {
+        ui.resultsPopup.style.display = 'block';
+        ui.resultsPopup.innerHTML = '<div class="couture-loading">Searching...</div>';
         try {
-            const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}`, {
-                headers: { 'ngrok-skip-browser-warning': 'true' }
-            });
+            const response = await fetch(`${API_URL}?q=${encodeURIComponent(query)}`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
             if (!response.ok) throw new Error('API request failed');
             const data = await response.json();
-            renderAutocomplete(data, popup);
+            renderAutocomplete(data);
         } catch (error) {
-            console.error('Error fetching search results:', error);
-            popup.style.display = 'none';
+            ui.resultsPopup.style.display = 'none';
         }
-    }
+    };
 
-    // Find all search inputs on the page and initialize them
-    document.querySelectorAll('form[action="/search"] input[name="q"]').forEach(initializeAutocomplete);
+    const renderAutocomplete = (data) => {
+        if (!data || (!data.suggestions?.length && !data.categories?.length && !data.product_ids?.length)) {
+            ui.resultsPopup.style.display = 'none';
+            return;
+        }
+
+        const layoutHtml = `
+            <div class="couture-autocomplete-wrapper">
+                <div class="left-panel"><div class="suggestions-container"></div><div class="categories-container"></div></div>
+                <div class="right-panel"><div class="products-container"></div></div>
+            </div>`;
+        ui.resultsPopup.innerHTML = layoutHtml;
+
+        const suggestionsContainer = ui.resultsPopup.querySelector('.suggestions-container');
+        if (data.suggestions?.length) {
+            const searchIconSvg = `<svg class="suggestion-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>`;
+            suggestionsContainer.innerHTML = `<h5>Suggestions</h5><ul>${data.suggestions.map(s => `<li>${searchIconSvg}<span>${s}</span></li>`).join('')}</ul>`;
+            suggestionsContainer.addEventListener('click', e => {
+                const li = e.target.closest('li');
+                if (li) window.location.href = `/search?q=${encodeURIComponent(li.textContent.trim())}`;
+            });
+        }
+        
+        const categoriesContainer = ui.resultsPopup.querySelector('.categories-container');
+        if (data.categories?.length) {
+            categoriesContainer.innerHTML = `<h5>Categories</h5><ul>${data.categories.map(c => `<li>${c.name} (${c.count})</li>`).join('')}</ul>`;
+        }
+
+        const productsContainer = ui.resultsPopup.querySelector('.products-container');
+        if (data.product_ids?.length) {
+            fetchProductData(data.product_ids, productsContainer);
+        } else {
+            productsContainer.innerHTML = '<h5>Products</h5><div class="couture-no-products">No products found.</div>';
+        }
+    };
+
+    const fetchProductData = async (handles, container) => {
+        container.innerHTML = '<h5>Products</h5><div class="couture-products-loading">Loading...</div>';
+        try {
+            const requests = handles.slice(0, 5).map(handle => fetch(`/products/${handle}.js`));
+            const products = await Promise.all((await Promise.all(requests)).map(res => res.json()));
+            
+            const productHtml = products.map(p => {
+                const imgUrl = p.featured_image ? p.featured_image.replace(/(\.[\w\?]+)$/, '_100x100$1') : 'https://placehold.co/100x100/EEE/31343C?text=N/A';
+                const price = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p.price / 100);
+                return `
+                    <li class="couture-product-card">
+                        <a href="${p.url}">
+                            <img src="${imgUrl}" alt="${p.title}" class="couture-product-image"/>
+                            <div class="couture-product-details">
+                                <span class="couture-product-title">${p.title}</span>
+                                <span class="couture-product-price">${price}</span>
+                            </div>
+                        </a>
+                    </li>`;
+            }).join('');
+            container.innerHTML = `<h5>Products</h5><ul class="couture-product-list">${productHtml}</ul>`;
+        } catch (error) {
+            container.innerHTML = '<h5>Products</h5><div class="couture-products-error">Error loading products.</div>';
+        }
+    };
+    
+    /**
+     * Main initialization logic.
+     */
+    const initialize = () => {
+        hijackSearchTriggers();
+        createCustomSearchUI();
+        document.querySelectorAll('.search-modal, [id*="search-modal"], dialog[class*="search"]').forEach(m => {
+            m.style.display = 'none';
+            m.style.visibility = 'hidden';
+        });
+    };
+
+    // Run on load and observe for changes.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+    
+    new MutationObserver(hijackSearchTriggers).observe(document.body, { childList: true, subtree: true });
+
 })();
+
