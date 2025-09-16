@@ -3,7 +3,11 @@ from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from models.database import create_db_and_tables, create_folders
-from services.shopify_auth_service import verify_hmac_signature, get_shop_access_token
+from services.shopify_auth_service import (
+    verify_hmac_signature,
+    get_shop_access_token,
+    get_shop_api_key,
+)
 from routers import auth_router, sync_router, api_router
 
 app = FastAPI(title="Couture Search Shopify App")
@@ -50,7 +54,11 @@ async def root():
 
 
 @app.get("/admin", response_class=HTMLResponse)
-def admin_dashboard(request: Request, shop: str = Depends(verify_hmac_signature)):
+def admin_dashboard(
+    request: Request,
+    shop: str = Depends(verify_hmac_signature),
+    api_key: str = Depends(get_shop_api_key),
+):
     """Serves the main admin dashboard UI for the app, protected by HMAC verification."""
     if not shop:
         return HTMLResponse(
@@ -61,12 +69,7 @@ def admin_dashboard(request: Request, shop: str = Depends(verify_hmac_signature)
     if not token_exists:
         return RedirectResponse(url=f"/auth/install?shop={shop}")
 
-    host = request.query_params.get("host")
     return templates.TemplateResponse(
         "admin_dashboard.html",
-        {
-            "request": request,
-            "shop": shop,
-            "host": host,
-        },
+        {"request": request, "api_key": api_key},
     )

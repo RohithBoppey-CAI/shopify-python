@@ -4,8 +4,6 @@ from fastapi.templating import Jinja2Templates
 from core.config import settings
 from services.shopify_auth_service import (
     get_install_url,
-    verify_hmac_signature,
-    get_shop_access_token,
     save_or_update_token_in_db,
     exchange_code_for_token,
 )
@@ -41,6 +39,7 @@ async def auth_callback(request: Request):
     if access_token:
         save_or_update_token_in_db(shop=shop, access_token=access_token)
         client = ShopifyAPIClient(shop_url=shop, access_token=access_token)
+        client.create_api_key_metaobject()
         trigger_initial_product_sync(client=client)
 
     final_admin_url = f"{settings.APP_URL}/admin?{request.url.query}"

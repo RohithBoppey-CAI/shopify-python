@@ -1,13 +1,15 @@
 {% comment %}
-  FINAL COMBINED VERSION
-  - Data Source: Dynamically configured using Metaobjects for flexibility.
-  - Rendering: Uses the advanced theme-scraping engine to perfectly match your theme's product card style.
-  - Behavior: Renders a clean, horizontally-scrolling carousel without causing page overflow.
+FINAL COMBINED VERSION
+- Data Source: Dynamically configured using Metaobjects for flexibility.
+- Rendering: Uses the advanced theme-scraping engine to perfectly match your theme's product card style.
+- Behavior: Renders a clean, horizontally-scrolling carousel without causing page overflow.
 {% endcomment %}
 
 {% liquid
   assign carousel_handle = section.settings.carousel_metaobject_handle
   assign carousel_config = nil
+  assign api_key_object = shop.metaobjects.couture_api_key_storage['api-key-storage']
+  assign couture_api_key = api_key_object.api_key.value
   for item in shop.metaobjects['couture_product_carousel'].values
     if item.handle == carousel_handle
       assign carousel_config = item
@@ -17,64 +19,63 @@
 %}
 
 {% if carousel_config != blank %}
-<div
-  class="couture-carousel-section page-width"
-  id="couture-container-{{ section.id }}"
-  data-section-id="{{ section.id }}"
-  data-api-endpoint="{{ carousel_config.endpoint.value }}"
-  data-user-selector="{{ block.settings.user_product_selector }}"
-  data-debug-mode="{{ block.settings.debug_mode }}"
-  data-carousel-handle="{{ block.settings.carousel_metaobject_handle | default: 'new-products' }}"
->
-  {% comment %} Section Header from Metaobject {% endcomment %}
-  <h3 class="h2" style="text-align: left;">
-    {{ block.settings.carousel_metaobject_handle | default: 'Featured Products' | replace: '-', ' ' | capitalize }}
-  </h3>
-  {% comment %} <p style="text-align: left;">
-    {{ carousel_config.caption.value }}
-  </p> {% endcomment %}
-  
-  {% if block.settings.debug_mode %}
-  <div class="couture-debug-panel" style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-size: 12px;">
-      <strong>Debug Information:</strong>
-      <p><strong>Metaobject Handle:</strong> {{ carousel_handle }}</p>
-      <p><strong>User Product Selector:</strong> {{ section.settings.user_product_selector | default: 'Not set' }}</p>
-      <div id="debug-log-{{ section.id }}"></div>
-  </div>
-  {% endif %}
-  
-  {% comment %} This wrapper will contain the horizontally scrollable products {% endcomment %}
-  <div class="couture-carousel-wrapper" id="couture-carousel-wrapper-{{ section.id }}">
-      <div class="couture-carousel" id="couture-carousel-{{ section.id }}">
-          <p>Loading products...</p>
-      </div>
-  </div>
+<div class="couture-carousel-section page-width" id="couture-container-{{ section.id }}"
+    data-section-id="{{ section.id }}" data-api-endpoint="{{ carousel_config.endpoint.value }}"
+    data-api-key="{{ couture_api_key }}" data-user-selector="{{ block.settings.user_product_selector }}"
+    data-debug-mode="{{ block.settings.debug_mode }}"
+    data-carousel-handle="{{ block.settings.carousel_metaobject_handle | default: 'new-products' }}">
+    {% comment %} Section Header from Metaobject {% endcomment %}
+    <h3 class="h2" style="text-align: left;">
+        {{ block.settings.carousel_metaobject_handle | default: 'Featured Products' | replace: '-', ' ' | capitalize }}
+    </h3>
+    {% comment %} <p style="text-align: left;">
+        {{ carousel_config.caption.value }}
+    </p> {% endcomment %}
+
+    {% if block.settings.debug_mode %}
+    <div class="couture-debug-panel"
+        style="background: #f0f8ff; border: 1px solid #ccc; padding: 15px; margin: 10px 0; font-size: 12px;">
+        <strong>Debug Information:</strong>
+        <p><strong>Metaobject Handle:</strong> {{ carousel_handle }}</p>
+        <p><strong>User Product Selector:</strong> {{ section.settings.user_product_selector | default: 'Not set' }}</p>
+        <div id="debug-log-{{ section.id }}"></div>
+    </div>
+    {% endif %}
+
+    {% comment %} This wrapper will contain the horizontally scrollable products {% endcomment %}
+    <div class="couture-carousel-wrapper" id="couture-carousel-wrapper-{{ section.id }}">
+        <div class="couture-carousel" id="couture-carousel-{{ section.id }}">
+            <p>Loading products...</p>
+        </div>
+    </div>
 </div>
 {% endif %}
 
 <script>
-document.addEventListener('DOMContentLoaded', async function () {
-    const container = document.getElementById('couture-container-{{ section.id }}');
-    if (!container) return;
+    document.addEventListener('DOMContentLoaded', async function () {
+        const container = document.getElementById('couture-container-{{ section.id }}');
+        if (!container) return;
 
-    function toKebabCase(text) {
-        return text.trim().toLowerCase().replace(/\s+/g, "-");
-    }
+        function toKebabCase(text) {
+            return text.trim().toLowerCase().replace(/\s+/g, "-");
+        }
 
-    // --- Configuration now comes from metaobjects and section settings via data attributes ---
-    const sectionId = container.dataset.sectionId;
-    const userProductSelector = container.dataset.userSelector;
-    const debugMode = container.dataset.debugMode === 'true';
-    
-    const handle = container.dataset.carouselHandle;
-    const allCarousels = {{ shop.metaobjects['couture_product_carousel'].values | json }};
-    
+        // --- Configuration now comes from metaobjects and section settings via data attributes ---
+        const sectionId = container.dataset.sectionId;
+        const coutureApiKey = container.dataset.apiKey;
+        const userProductSelector = container.dataset.userSelector;
+        const debugMode = container.dataset.debugMode === 'true';
+
+        const handle = container.dataset.carouselHandle;
+        const allCarousels = {{ shop.metaobjects['couture_product_carousel'].values | json
+    }};
+
     const chosen = allCarousels.find(item => toKebabCase(item.name) === toKebabCase(handle) && item.enabled_default == true);
     let apiUrl = chosen ? chosen.endpoint : null;
     console.log(allCarousels, apiUrl)
 
     // --- Helper Functions from app_embed.liquid (unchanged) ---
-     const sectionSettings = {
+    const sectionSettings = {
         "carousel_metaobject_handle": {{ block.settings.carousel_metaobject_handle | json }},
         "user_product_selector": {{ block.settings.user_product_selector | json }},
         "debug_mode": {{ block.settings.debug_mode | json }}
@@ -100,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const response = await fetch(searchUrl);
         if (!response.ok) throw new Error(`Search request failed: ${response.status}`);
-        
+
         const html = await response.text();
         const doc = new DOMParser().parseFromString(html, 'text/html');
         const productElements = doc.querySelectorAll(selector);
@@ -109,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         const extractedCards = Array.from(productElements).map(el => el.outerHTML);
         document.getElementById('couture-carousel-' + sectionId).innerHTML = extractedCards.join('');
-        
+
         debugLog('SUCCESS: Scraping successful', { foundElements: productElements.length });
     }
 
@@ -143,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             carousel.style.display = 'flex';
             carousel.style.overflowX = 'auto';
             carousel.style.paddingBottom = '10px';
-            
+
             const items = carousel.children;
             for (let item of items) {
                 item.style.flexShrink = '0';
@@ -176,46 +177,46 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
 
         // 1. Fetch product handles from the dynamic API endpoint
-        const apiKey = 'df2dc6b8360a3bf8ecca291e2c72ffdb';
         const storeIdentifier = '{{ shop.permanent_domain }}';
-        const currentProductId = {{ product.id | json }};
+        const currentProductId = {{ product.id | json
+    }};
 
-        if (currentProductId) {
-            apiUrl += `?product_id=${currentProductId}`
+    if (currentProductId) {
+        apiUrl += `?product_id=${currentProductId}`
+    }
+
+    const handleResponse = await fetch(apiUrl, {
+        headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'X-Api-Key': coutureApiKey,
+            'X-Store-Identifier': storeIdentifier
         }
+    });
 
-        const handleResponse = await fetch(apiUrl, {
-            headers: {
-                'ngrok-skip-browser-warning': 'true',
-                'X-Api-Key': apiKey,
-                'X-Store-Identifier': storeIdentifier
-            }
-        });
+    if (!handleResponse.ok) throw new Error(`API request failed with status: ${handleResponse.status}`);
+    const handleData = await handleResponse.json();
+    const productHandles = handleData.product_handles;
+    if (!productHandles || productHandles.length === 0) {
+        document.getElementById('couture-carousel-' + sectionId).innerHTML = `<p>No products to display.</p>`;
+        debugLog('API returned no product handles. Halting execution.');
+        return;
+    }
 
-        if (!handleResponse.ok) throw new Error(`API request failed with status: ${handleResponse.status}`);
-        const handleData = await handleResponse.json();
-        const productHandles = handleData.product_handles;
-        if (!productHandles || productHandles.length === 0) {
-            document.getElementById('couture-carousel-' + sectionId).innerHTML = `<p>No products to display.</p>`;
-            debugLog('API returned no product handles. Halting execution.');
-            return;
-        }
+    debugLog('Received handles from API', { count: productHandles.length, handles: productHandles });
 
-        debugLog('Received handles from API', { count: productHandles.length, handles: productHandles });
+    // 2. Render products by scraping theme, with auto-detection as a fallback
+    if (userProductSelector && userProductSelector.trim()) {
+        await renderByScraping(productHandles, userProductSelector);
+    } else {
+        await renderWithAutoDetection(productHandles);
+    }
 
-        // 2. Render products by scraping theme, with auto-detection as a fallback
-        if (userProductSelector && userProductSelector.trim()) {
-            await renderByScraping(productHandles, userProductSelector);
-        } else {
-            await renderWithAutoDetection(productHandles);
-        }
+    // 3. Apply additional styling and reinitialize scripts (added from app_embed)
+    const carouselContainer = document.getElementById('couture-carousel-' + sectionId);
+    applyCarouselStyling(carouselContainer);
+    reinitializeThemeScripts(carouselContainer);
 
-        // 3. Apply additional styling and reinitialize scripts (added from app_embed)
-        const carouselContainer = document.getElementById('couture-carousel-' + sectionId);
-        applyCarouselStyling(carouselContainer);
-        reinitializeThemeScripts(carouselContainer);
-        
-        debugLog('Render process completed successfully.');
+    debugLog('Render process completed successfully.');
 
     } catch (error) {
         showErrorMessage(error.message);
@@ -270,32 +271,34 @@ document.addEventListener('DOMContentLoaded', async function () {
 {% endschema %}
 
 <style>
-    /* * --- FINAL FIX ---
-     * This more robust CSS is designed to override theme conflicts and
-     * ensure the carousel scrolls internally without affecting the page layout.
-    */
-
-    /* This wrapper div makes the horizontal scroll work correctly */
     .couture-carousel-wrapper {
-        display: grid; /* This is key for containing the flexbox child */
-        grid-template-columns: 100%; /* Explicitly define a single column */
+        display: grid;
+        /* This is key for containing the flexbox child */
+        grid-template-columns: 100%;
+        /* Explicitly define a single column */
         overflow-x: auto;
-        padding-bottom: 20px; /* Space for the scrollbar */
-        scrollbar-width: thin; /* For Firefox */
-        scrollbar-color: #ccc transparent; /* For Firefox */
+        padding-bottom: 20px;
+        /* Space for the scrollbar */
+        scrollbar-width: thin;
+        /* For Firefox */
+        scrollbar-color: #ccc transparent;
+        /* For Firefox */
     }
 
     /* Webkit scrollbar styling */
     .couture-carousel-wrapper::-webkit-scrollbar {
         height: 8px;
     }
+
     .couture-carousel-wrapper::-webkit-scrollbar-track {
         background: transparent;
     }
+
     .couture-carousel-wrapper::-webkit-scrollbar-thumb {
         background: #ccc;
         border-radius: 4px;
     }
+
     .couture-carousel-wrapper::-webkit-scrollbar-thumb:hover {
         background: #999;
     }
@@ -303,19 +306,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     /* This div holds the product cards themselves */
     .couture-carousel {
         display: flex;
-        flex-wrap: nowrap; /* Ensures items stay in a single line */
+        flex-wrap: nowrap;
+        /* Ensures items stay in a single line */
         padding-left: 0;
         margin: 0;
     }
 
     /* This targets each product card that the scraping logic inserts. */
-    .couture-carousel > * {
-        flex: 0 0 280px; /* Don't grow, don't shrink, base width of 280px */
+    .couture-carousel>* {
+        flex: 0 0 280px;
+        /* Don't grow, don't shrink, base width of 280px */
         width: 280px;
     }
 
     /* Using margin for spacing, just like the working example */
-    .couture-carousel > *:not(:last-child) {
+    .couture-carousel>*:not(:last-child) {
         margin-right: 30px;
     }
 
@@ -328,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         object-fit: cover;
         margin-bottom: 1rem;
     }
-    
+
     .couture-carousel .card__content,
     .couture-carousel .card-information,
     .couture-carousel .product-card__info {
@@ -336,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         padding: 0 5px;
         text-decoration: none;
     }
-    
+
     .couture-carousel a {
         text-decoration: none;
         color: inherit;

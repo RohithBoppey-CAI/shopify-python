@@ -9,7 +9,6 @@ import hashlib
 
 from models.database import SessionLocal, Store
 
-
 def get_install_url(shop: str) -> str:
     """
     Generates the Shopify authorization URL for the merchant to install the app.
@@ -59,6 +58,15 @@ def get_shop_access_token(shop: str) -> str | None:
         return store_access_token
     finally:
         db.close()
+
+
+def get_shop_api_key(request: Request, shop: str) -> str | None:
+    try:
+        print(f"Shop: {shop} | API_KEY: {settings.PROXY_API_KEY}")
+        # TODO: fetch the API key from the DB, as ideally the API generated will be different for each user
+        return settings.PROXY_API_KEY
+    except Exception as e:
+        print(f"Exception in API KEY: {e}")
 
 
 def save_or_update_token_in_db(shop: str, access_token: str):

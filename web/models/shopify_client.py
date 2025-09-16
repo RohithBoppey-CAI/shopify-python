@@ -491,3 +491,150 @@ class ShopifyAPIClient:
 
         # Extract just the string handles from the response
         return [scope["handle"] for scope in scopes]
+
+    def ensure_api_key_definition(self) -> str:
+        """
+        Checks if the API Key metaobject definition exists. If not, creates it.
+        Returns the ID of the definition.
+        """
+        print("[DEBUG] Checking for API Key Metaobject Definition...")
+
+        # 1. Check if the definition already exists
+        find_query = """
+            query($type: String!) {
+                metaobjectDefinitionByType(type: $type) {
+                    id
+                }
+            }
+        """
+        # BUG FIX #1: The type being checked for must match the type being created.
+        variables = {"type": "couture_api_key_storage"}
+        response = self._execute_query(find_query, variables)
+        existing_definition = response.get("data", {}).get("metaobjectDefinitionByType")
+
+        if existing_definition and existing_definition.get("id"):
+            print(
+                f"[DEBUG] Found existing API Key definition: {existing_definition['id']}"
+            )
+            return existing_definition["id"]
+
+        # 2. If it doesn't exist, create it
+        print("[DEBUG] No API Key definition found. Creating a new one...")
+        create_mutation = """
+            mutation createMetaobjectDefinition($definition: MetaobjectDefinitionCreateInput!) {
+                metaobjectDefinitionCreate(definition: $definition) {
+                    metaobjectDefinition {
+                        id
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+        """
+        variables = {
+            "definition": {
+                "name": "API Key Storage",
+                "type": "couture_api_key_storage",
+                # BUG FIX #2: Removed the "access" block to resolve the error.
+                # The metaobject will get default permissions, which is standard.
+                "fieldDefinitions": [
+                    {
+                        "name": "API Key",
+                        "key": "api_key",
+                        "type": "single_line_text_field",
+                    }
+                ],
+            }
+        }
+
+        response = self._execute_query(create_mutation, variables)
+
+        # Error handling
+        create_data = response.get("data", {}).get("metaobjectDefinitionCreate", {})
+        user_errors = create_data.get("userErrors", [])
+        if user_errors:
+            error_messages = [e["message"] for e in user_errors]
+            raise Exception(f"Could not create API Key definition: {error_messages}")
+
+        new_definition = create_data.get("metaobjectDefinition")
+        if new_definition and new_definition.get("id"):
+            print(
+                f"[DEBUG] Successfully created new API Key definition: {new_definition['id']}"
+            )
+            return new_definition["id"]
+        else:
+            raise Exception(
+                f"Failed to create API Key metaobject definition. Response: {response}"
+            )
+
+    def create_api_key_metaobject(self, api_key: str = "<YOUR_API_KEY>"):
+        """
+        Creates a metaobject instance to store an API key.
+        This function is designed to be called once after app installation.
+
+        Prerequisite: A metaobject definition with the type 'api_key_storage'
+        must exist in the Shopify Partner Dashboard.
+        """
+        print("[DEBUG] Attempting to create API_KEY metaobject...")
+
+        self.ensure_api_key_definition()
+
+        # The GraphQL mutation to create a metaobject instance.
+        mutation = """
+        mutation CreateApiKeyMetaobject($metaobject: MetaobjectCreateInput!) {
+          metaobjectCreate(metaobject: $metaobject) {
+            metaobject {
+              id
+              handle
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+        """
+
+        # The variables for the mutation query.
+        # This structure must match the definition you created in the Partner Dashboard.
+        variables = {
+            "metaobject": {
+                "type": "couture_api_key_storage",
+                "handle": "api-key-storage",
+                "fields": [{"key": "api_key", "value": api_key}],
+            }
+        }
+
+        # Use the client's internal _execute_query method
+        response = self._execute_query(query=mutation, variables=variables)
+
+        # Check for top-level GraphQL errors (e.g., syntax errors in the query)
+        if "errors" in response:
+            error_detail = response["errors"]
+            print(f"[ERROR] GraphQL query failed: {error_detail}")
+            raise Exception(f"GraphQL query failed: {error_detail}")
+
+        # Check for specific user errors returned by the mutation
+        create_data = response.get("data", {}).get("metaobjectCreate", {})
+        user_errors = create_data.get("userErrors", [])
+
+        if user_errors:
+            error_messages = [e["message"] for e in user_errors]
+            print(f"[ERROR] Failed to create metaobject: {error_messages}")
+            raise Exception(f"Failed to create metaobject: {', '.join(error_messages)}")
+
+        created_metaobject = create_data.get("metaobject")
+        if created_metaobject and created_metaobject.get("id"):
+            print(
+                f"[DEBUG] Successfully created API_KEY metaobject with ID: {created_metaobject['id']}"
+            )
+            return created_metaobject
+        else:
+            print(
+                f"[ERROR] Metaobject creation did not return the expected object. Response: {response}"
+            )
+            raise Exception(
+                "Metaobject creation response was invalid or did not contain a metaobject ID."
+            )

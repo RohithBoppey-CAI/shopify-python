@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import json
 from dependencies.shopify import get_shopify_client_from_query
@@ -9,8 +9,13 @@ from services.shopify_product_service import (
 )
 from services.shopify_config_service import sync_reco_configurations
 from models import ShopifyAPIClient
+from middleware.authentication import validate_shopify_incoming_request
 
-router = APIRouter(prefix="/sync", tags=["Synchronization"])
+router = APIRouter(
+    prefix="/sync",
+    tags=["Synchronization"],
+    dependencies=[Depends(validate_shopify_incoming_request)],
+)
 
 
 class SyncRequest(BaseModel):

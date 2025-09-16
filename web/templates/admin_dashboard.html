@@ -309,6 +309,7 @@
 
     <script>
         const shopDomain = new URL(location.href).searchParams.get('shop');
+        const apiKey = "{{ api_key }}"
 
         function openTab(evt, tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -320,7 +321,12 @@
         async function fetchHistory(endpoint, tableId, statusId) {
             const tableBody = document.querySelector(`#${tableId} tbody`);
             try {
-                const response = await fetch(`${endpoint}?shop=${shopDomain}`);
+                const response = await fetch(`${endpoint}?shop=${shopDomain}`, {
+                    headers: { // <-- ADD THIS HEADERS BLOCK
+                        'X-Api-Key': apiKey,
+                        'X-Store-Identifier': shopDomain
+                    }
+                });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Failed to fetch history');
 
@@ -370,7 +376,11 @@
                 try {
                     const response = await fetch(endpoint, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Api-Key': apiKey,
+                            'X-Store-Identifier': shopDomain
+                        },
                         body: JSON.stringify({ shop: shopDomain })
                     });
                     const result = await response.json();

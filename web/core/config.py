@@ -23,6 +23,6 @@ class Settings(BaseSettings):
 
     # Proxy URL for hitting requests like: similarity endpoint, product handles, etc
     PROXY_SERVER_URL: str = "http://localhost:8003/shopify"
-    
+    PROXY_API_KEY: str = "API_KEY"
 
 settings = Settings()

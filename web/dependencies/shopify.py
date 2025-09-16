@@ -41,3 +41,5 @@ async def get_shopify_client_from_query(request: Request) -> ShopifyAPIClient:
         raise HTTPException(status_code=401, detail="No access token found for shop")
 
     return ShopifyAPIClient(shop_url=shop, access_token=access_token)
+
+
