@@ -5,9 +5,15 @@
   - Fixes the infinite loop bug when clearing the search bar.
 {% endcomment %}
 
+{% liquid
+  assign api_key_object = shop.metaobjects.couture_api_key_storage['api-key-storage']
+  assign couture_api_key = api_key_object.api_key.value
+%}
+
 <div
   class="couture-search-section page-width"
   id="couture-container-{{ section.id }}"
+  data-api-key="{{ couture_api_key }}"
   data-section-id="{{ section.id }}"
   data-api-base-url="{{ block.settings.api_base_url }}"
   data-user-selector="{{ block.settings.user_product_selector }}"
@@ -83,6 +89,9 @@ document.addEventListener('DOMContentLoaded', function () {
     
     const paginationContainer = document.getElementById('couture-pagination-container-' + sectionId);
     const sortByDropdown = document.getElementById('couture-sort-by-' + sectionId);
+
+    const coutureApiKey = container.dataset.apiKey;
+    const storeIdentifier = '{{ shop.permanent_domain }}';
 
     // --- State Management ---
     let state = {
@@ -288,7 +297,13 @@ document.addEventListener('DOMContentLoaded', function () {
         apiUrl.searchParams.set('sort_by', sort_by);
         apiUrl.searchParams.set('sort_order', sort_order || 'desc');
 
-        const handleResponse = await fetch(apiUrl, { headers: { 'ngrok-skip-browser-warning': 'true' } });
+        const handleResponse = await fetch(apiUrl, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'X-Api-Key': coutureApiKey,
+            'X-Store-Identifier': storeIdentifier
+          }
+        });
         const handleData = await handleResponse.json();
         
         state.totalCount = handleData.total_count;
