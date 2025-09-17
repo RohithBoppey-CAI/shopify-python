@@ -37,3 +37,16 @@ def create_folders(folders=[]):
             print(f"Created or already exists: {folder}")
         except Exception as e:
             print(f"Failed to create {folder}: {e}")
+
+
+def remove_shopify_db():
+    """
+    Removes the existing SQLite database file.
+    Use with caution as this will delete all data.
+    """
+    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+    if os.path.exists(db_path):
+        os.remove(db_path)
+        print(f"Removed database file at {db_path}")
+    else:
+        print(f"No database file found at {db_path} to remove.")

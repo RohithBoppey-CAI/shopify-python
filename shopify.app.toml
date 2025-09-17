@@ -2,7 +2,7 @@
 
 name = "Couture Search and Recos"
 client_id = "8ba440c9bab74a1414d838c129248691"
-application_url = "https://d768bf47be7c.ngrok-free.app/admin"
+application_url = "https://f673388d8d70.ngrok-free.app/admin"
 embedded = false
 
 [access_scopes]
@@ -10,7 +10,7 @@ scopes = "read_products,read_orders,read_all_orders,write_metaobject_definitions
 
 [auth]
 redirect_urls = [
-    "https://d768bf47be7c.ngrok-free.app/auth/callback"
+    "https://f673388d8d70.ngrok-free.app/auth/callback"
 ]
 
 [webhooks]

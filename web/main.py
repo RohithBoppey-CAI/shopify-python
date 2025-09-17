@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from models.database import create_db_and_tables, create_folders
+from models.database import create_db_and_tables, create_folders, remove_shopify_db
 from services.shopify_auth_service import (
     verify_hmac_signature,
     get_shop_access_token,
@@ -17,8 +17,16 @@ app = FastAPI(title="Couture Search Shopify App")
 @app.on_event("startup")
 def on_startup():
     """Initialize database tables on startup"""
+    remove_shopify_db()
     create_db_and_tables()
     create_folders(folders=["downloads", "tokens"])
+
+
+# remove the shopify db on closing the application
+@app.on_event("shutdown")
+def on_shutdown():
+    """Cleanup actions on shutdown"""
+    remove_shopify_db()
 
 
 # CORS Configuration
