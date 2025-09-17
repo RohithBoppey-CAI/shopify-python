@@ -72,7 +72,6 @@ FINAL COMBINED VERSION
 
     const chosen = allCarousels.find(item => toKebabCase(item.name) === toKebabCase(handle) && item.enabled_default == true);
     let apiUrl = chosen ? chosen.endpoint : null;
-    console.log(allCarousels, apiUrl)
 
     // --- Helper Functions from app_embed.liquid (unchanged) ---
     const sectionSettings = {
